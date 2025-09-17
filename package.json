@@ -9,13 +9,14 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [ "onLanguage:xml" ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
+    "languages": [
       {
-        "command": "tei-xml-formatter.helloWorld",
-        "title": "Hello World"
+        "id": "xml",
+        "aliases": ["XML", "xml"],
+        "extensions": [ ".xml" ]
       }
     ]
   },
