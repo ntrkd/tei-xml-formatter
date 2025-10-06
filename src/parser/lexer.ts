@@ -3,6 +3,7 @@ import { Position } from "vscode";
 import { TextDocument } from "vscode";
 import { Token, TokenType } from "./token";
 import { posix } from "path";
+import { randomBytes } from "crypto";
 
 /**
  * @param document the document the lexer will tokenize.
@@ -12,7 +13,7 @@ import { posix } from "path";
 type LexerState = {
     document: TextDocument;
 
-    readPos: Position;
+    readPos: Position | undefined;
     peekPos: Position;
     currChar: string;
 }
@@ -48,21 +49,48 @@ export class Lexer {
         
     }
 
-    nextToken() : Token {
+    /**
+     * Gets and returns the next token in the document
+     * @returns the next token or undefined if we have reached the end of the document
+     */
+    nextToken() : Token | undefined {
         let tok: Token; // Return token
+        if (this.state.readPos === undefined) { return undefined; };
+        this.state.peekPos = this.state.readPos;
+        this.state.currChar = this.state.document.getText(new Range(this.state.readPos, new Position(this.state.readPos.line, this.state.readPos.character + 1)));
 
         // When the currChar is undefined we are at the end of the line
         switch (this.state.currChar) {
             case " ": {
-                // First peek until the next non-whitespace char
-                // Load all those into a token, and return it
+                tok = { Name: "WhiteSpace", Literal: " ", Range: new Range(this.state.readPos, new Position(0, 0))};
+                
+                do {
+                    let nextPosReturn: Range | undefined = this.nextPosition(this.state.peekPos);
+                    if (nextPosReturn === undefined) { break; }
+                    this.state.peekPos = nextPosReturn.start;
+                } while(this.state.document.getText(new Range(this.state.peekPos, new Position(this.state.peekPos.line, this.state.peekPos.character + 1))) === " ");
+
+                tok.Range = new Range(this.state.readPos, this.state.peekPos);
+                tok.Literal = this.state.document.getText(tok.Range);
+                break;
+            }
+            default: {
+                let rng = new Range(this.state.readPos, new Position(this.state.readPos.line, this.state.readPos.character + 1));
+                tok = { Name: "Illegal", Literal: this.state.document.getText(rng), Range: rng };
+                break;
             }
         }
 
-        // Set the readPos equal to peekPos and set peekPos equal to readPos
+        // Set the readPos equal to peekPos
+        let nextPos = this.nextPosition(this.state.peekPos);
+        if (nextPos === undefined) {
+            // reached the end of the document
+            this.state.readPos = undefined;
+        } else {
+            this.state.readPos = nextPos.start;
+        }
 
-        // REMOVE THIS, to preven tthe error
-        return { Literal: "", Name: "Attribute", Range: new Range(new Position(0, 0), new Position(0, 0))};
+        return tok;
     }
     
     nextPosition(pos: Position): Range | undefined {
