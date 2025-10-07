@@ -30,4 +30,18 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
         return;
     }
+
+    /**
+     * Helper function to insert the correct nubmer of indents
+     * @param numTabs Number of tabs to retun
+     * @returns a string with numTab number of \t
+     */
+    tabLines(numTabs: number): string {
+        let str = "";
+        for (let i = 0; i < numTabs; i++) {
+            str += "\t";
+        }
+
+        return str;
+    }
 }
