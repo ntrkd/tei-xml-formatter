@@ -55,6 +55,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "he": "^1.2.0",
     "saxes": "^6.0.0"
   }
 }
