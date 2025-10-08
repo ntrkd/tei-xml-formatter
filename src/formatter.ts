@@ -58,10 +58,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             const size = Object.keys(tag.attributes).length;
 
             if (size === 0) { // Is a regular closing tag
-                if (tag.isSelfClosing) { formattedTag += `/`; indent--; }
+                if (tag.isSelfClosing) { formattedTag += `/`; }
                 formattedTag += `>`;
                 formatted.push(`${this.tabLines(indent)}${formattedTag}`);
-                indent++;
+
+                if (!tag.isSelfClosing) { indent++; }
                 return;
             }
             for (const key in tag.attributes) {
@@ -73,7 +74,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             formatted.push(`${this.tabLines(indent)}${formattedTag}`);
 
             indent++;
-            console.log(indent);
         });
         
         parser.on("closetag", tag => {
