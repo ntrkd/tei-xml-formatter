@@ -46,11 +46,50 @@ export class SpaceOrLine extends Node {
   }
 }
 
+export class Line extends Node {
+  public kind = "Line" as const;
+
+  constructor() {
+    super();
+  }
+
+  width() : number {
+    return 1;
+  }
+}
+
+export class LineIndent extends Node {
+  public kind = "LineIndent" as const;
+
+  constructor() {
+    super();
+  }
+
+  width() : number {
+    return 1;
+  }
+}
+
+export class LineDeindent extends Node {
+  public kind = "LineDeindent" as const;
+
+  constructor() {
+    super();
+  }
+
+  width() : number {
+    return 1;
+  }
+}
+
 /*
 We define these types
 Group - Contains multiple nodes within it that should try to be put on the same line. It does not force the Group nodes contained within it to wrap or be on the same line.
 Text - Contains text
 SpaceOrLine - Rendered to a space if no wrapping needed, else a line.
+Line - Insert new line and keep indent level
+LineIndent - Insert new line and increase indent by 1
+LineDeindent - Insert new line and decrease indent by 1
 */
 
 /* Sample TEI XML for reference
