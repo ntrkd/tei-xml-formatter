@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SaxesParser } from 'saxes';
-import { Group, Text, SpaceOrLine, LineIndent, LineDeindent } from './types/Nodes';
+import { Group, Text, SpaceOrLine, LineIndent, LineDeindent, Line } from './types/Nodes';
 import { parse } from 'path';
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
@@ -24,26 +24,22 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         });
         
         parser.on("xmldecl", dec => { // Always the first line in the XML document
-            let grp: Group = new Group([new Text("<?xml")]);
-
             if (dec.version !== undefined) {
-                grp.nodes.push(new SpaceOrLine());
-                grp.nodes.push(new Text(`version="${dec.version}"`));
+                root.nodes.push(new SpaceOrLine());
+                root.nodes.push(new Text(`version="${dec.version}"`));
             }
 
             if (dec.encoding !== undefined) {
-                grp.nodes.push(new SpaceOrLine());
-                grp.nodes.push(new Text(`encoding="${dec.encoding}"`));
+                root.nodes.push(new SpaceOrLine());
+                root.nodes.push(new Text(`encoding="${dec.encoding}"`));
             }
 
             if (dec.standalone !== undefined) {
-                grp.nodes.push(new SpaceOrLine());
-                grp.nodes.push(new Text(`standalone="${dec.standalone}"`));
+                root.nodes.push(new SpaceOrLine());
+                root.nodes.push(new Text(`standalone="${dec.standalone}"`));
             }
 
-            grp.nodes.push(new Text("?>"));
-
-            root.nodes.push(grp);
+            root.nodes.push(new Text("?>"));
         });
         
         parser.on("doctype", doc => {
@@ -86,12 +82,10 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 inPLike = true;
             }
 
-            // Check if we are not in pLike to auto indent
             if (!inPLike) {
-                root.nodes.push(new LineIndent);
+                root.nodes.push(new Line);
             }
 
-            let grp: Group = new Group([]);
             let body: string = `<${tag.name}`;
 
             for (const key in tag.attributes) {
@@ -104,18 +98,21 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 body += ">";
             }
 
-            grp.nodes.push(new Text(body));
-            root.nodes.push(grp);
+            root.nodes.push(new Text(body));
+
+            // Check if we are not in pLike to auto indent
+            if (!inPLike) {
+                root.nodes.push(new Line);
+            }
         });
         
         parser.on("closetag", tag => {
             if (tag.isSelfClosing) { return; } // Self closing is handled in opentag event
 
-            root.nodes.push(new Text(`</${tag.name}>`));
-
             if (!inPLike) {
                 root.nodes.push(new LineDeindent);
             }
+            root.nodes.push(new Text(`</${tag.name}>`));
         });
         
         parser.on("comment", comment => {
