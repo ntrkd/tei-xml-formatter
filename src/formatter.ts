@@ -1,12 +1,15 @@
 import * as vscode from 'vscode';
 import { SaxesParser } from 'saxes';
-import { Group, Text, SpaceOrLine } from './types/Nodes';
+import { Group, Text, SpaceOrLine, LineIndent } from './types/Nodes';
 import { parse } from 'path';
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TextEdit[]> {
         const parser = new SaxesParser();
         const he = require("he");
+
+        const pLike: string[] = ["head", "p"];
+        let inPLike: boolean = false;
 
         /**
          * The document as a formatting tree
@@ -77,10 +80,16 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         });
         
         parser.on("opentag", tag => {
-            /*
-                On opening a new tag push it's group to the stack
-                <tag> text text <tag1> </tag1> </tag>
-            */
+            // Check for pLike
+            if (pLike.includes(tag.name)) {
+                root.nodes.push(new LineIndent);
+                inPLike = true;
+            }
+
+            // Check if we are not in pLike to auto indent
+            if (!inPLike) {
+                root.nodes.push(new LineIndent);
+            }
 
             let grp: Group = new Group([]);
             let body: string = `<${tag.name}`;
@@ -100,7 +109,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         });
         
         parser.on("closetag", tag => {
-            if (tag.isSelfClosing) { return; } // Already handled in open tag call
+            if (tag.isSelfClosing) { return; } // Self closing is handled in opentag event
 
             root.nodes.push(new Text(`</${tag.name}>`));
         });
@@ -121,8 +130,10 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         parser.on("text", text => {
             let parsed: string = text.replace(/[ \t\n]+/g, " ");
 
-            if (parsed === " " && root.nodes[root.nodes.length - 1].kind !== "SpaceOrLine") {
+            if (parsed === " " && inPLike && root.nodes[root.nodes.length - 1].kind !== "SpaceOrLine") {
                 root.nodes.push(new SpaceOrLine);
+                return;
+            } else if (!inPLike && parsed === " ") {
                 return;
             }
 
