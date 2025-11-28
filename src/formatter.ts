@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SaxesParser } from 'saxes';
-import { Group, Text, SpaceOrLine, LineIndent } from './types/Nodes';
+import { Group, Text, SpaceOrLine, LineIndent, LineDeindent } from './types/Nodes';
 import { parse } from 'path';
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
@@ -112,6 +112,10 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             if (tag.isSelfClosing) { return; } // Self closing is handled in opentag event
 
             root.nodes.push(new Text(`</${tag.name}>`));
+
+            if (!inPLike) {
+                root.nodes.push(new LineDeindent);
+            }
         });
         
         parser.on("comment", comment => {
