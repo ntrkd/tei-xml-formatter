@@ -8,7 +8,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         const parser = new SaxesParser();
         const he = require("he");
 
-        const pLike: string[] = ["head", "p"];
+        const pLike: string[] = ["head", "p", "closer"];
         let inPLike: boolean = false;
 
         /**
@@ -24,6 +24,8 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         });
         
         parser.on("xmldecl", dec => { // Always the first line in the XML document
+            root.nodes.push(new Text("<?xml"));
+
             if (dec.version !== undefined) {
                 root.nodes.push(new SpaceOrLine());
                 root.nodes.push(new Text(`version="${dec.version}"`));
@@ -40,6 +42,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             }
 
             root.nodes.push(new Text("?>"));
+            root.nodes.push(new Line());
         });
         
         parser.on("doctype", doc => {
@@ -77,14 +80,9 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         
         parser.on("opentag", tag => {
             // Check for pLike
-            if (pLike.includes(tag.name)) {
-                root.nodes.push(new LineIndent);
+            if (pLike.includes(tag.name) && !tag.isSelfClosing) {
                 inPLike = true;
-            }
-
-            if (!inPLike) {
-                root.nodes.push(new Line);
-            }
+            } 
 
             let body: string = `<${tag.name}`;
 
@@ -100,19 +98,24 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
             root.nodes.push(new Text(body));
 
-            // Check if we are not in pLike to auto indent
-            if (!inPLike) {
-                root.nodes.push(new Line);
+            if (!inPLike || pLike.includes(tag.name)) {
+                root.nodes.push(new LineIndent());
             }
         });
         
         parser.on("closetag", tag => {
             if (tag.isSelfClosing) { return; } // Self closing is handled in opentag event
 
-            if (!inPLike) {
-                root.nodes.push(new LineDeindent);
+            if (pLike.includes(tag.name)) {
+                inPLike = false;
+                root.nodes.push(new LineDeindent());
             }
+
             root.nodes.push(new Text(`</${tag.name}>`));
+
+            if (!inPLike || pLike.includes(tag.name)) {
+                root.nodes.push(new LineDeindent());
+            }
         });
         
         parser.on("comment", comment => {
