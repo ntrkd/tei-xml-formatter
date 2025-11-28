@@ -12,7 +12,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
          * The document as a formatting tree
          */
         let root: Group = new Group([]);
-        let parentStack: Group[] = [root];
         
 
         parser.on("error", function (e) {
@@ -97,16 +96,13 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             }
 
             grp.nodes.push(new Text(body));
-            parentStack[parentStack.length - 1].nodes.push(grp);
-            !tag.isSelfClosing && parentStack.push(grp);
+            root.nodes.push(grp);
         });
         
         parser.on("closetag", tag => {
             if (tag.isSelfClosing) { return; } // Already handled in open tag call
 
-            const parent = parentStack[parentStack.length - 1];
-            parent.nodes.push(new Text(`</${tag.name}>`));
-            parentStack.pop();
+            root.nodes.push(new Text(`</${tag.name}>`));
         });
         
         parser.on("comment", comment => {
@@ -124,14 +120,13 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         
         parser.on("text", text => {
             let parsed: string = text.replace(/[ \t\n]+/g, " ");
-            const parent = parentStack[parentStack.length - 1];
 
             if (parsed === " ") {
-                parent.nodes.push(new SpaceOrLine);
+                root.nodes.push(new SpaceOrLine);
                 return;
             }
 
-            parent.nodes.push(new Text(parsed));
+            root.nodes.push(new Text(parsed));
 
             // const node: Node = {
             //     type: "Text",
