@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { SaxesParser } from 'saxes';
-import { Group, Text, SpaceOrLine, LineIndent, LineDeindent, Line } from './types/Nodes';
+import { Node, Group, Text, SpaceOrLine, LineIndent, LineDeindent, Line } from './types/Nodes';
 import { parse } from 'path';
+import { text } from 'stream/consumers';
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TextEdit[]> {
@@ -174,6 +175,50 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             return value;
             }, 2), "utf8"));
 
+        const xmlFile = vscode.Uri.joinPath(folder.uri, "fmt.xml");
+        vscode.workspace.fs.writeFile(xmlFile, Buffer.from(this.generate(root)));
+
         return;
+    }
+
+    generate(root: Group): string {
+        let out = "";
+        let indent = 0;
+        let atLineStart = true;
+        const indentUnit = "  "; // or options.tabSize
+
+        const emitIndent = () => {
+            if (atLineStart) {
+            out += indentUnit.repeat(indent);
+            atLineStart = false;
+            }
+        };
+
+        for (const node of root.nodes) {
+            if (node instanceof Text) {
+            emitIndent();
+            out += node.text;
+
+            } else if (node instanceof SpaceOrLine) {
+            out += " ";
+            atLineStart = false;
+
+            } else if (node instanceof Line) {
+            out += "\n";
+            atLineStart = true;
+
+            } else if (node instanceof LineIndent) {
+            out += "\n";
+            indent++;
+            atLineStart = true;
+
+            } else if (node instanceof LineDeindent) {
+            indent = Math.max(0, indent - 1);
+            out += "\n";
+            atLineStart = true;
+            }
+        }
+
+        return out;
     }
 }

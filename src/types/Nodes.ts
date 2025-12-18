@@ -1,4 +1,4 @@
-abstract class Node {
+export abstract class Node {
   abstract kind: string;
   
   abstract width() : number
