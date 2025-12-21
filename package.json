@@ -1,29 +1,21 @@
 {
-  "name": "tei-xml-formatter",
-  "displayName": "TEI XML Formatter",
-  "description": "Formats TEI XML to be human readable without changing the output",
+  "name": "tei-xml-fmt",
+  "displayName": "tei-xml-fmt",
+  "description": "format tei xml documents",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.104.0"
+    "vscode": "^1.107.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onLanguage:xml"
-  ],
+  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
-    "languages": [
+    "commands": [
       {
-        "id": "xml",
-        "aliases": [
-          "XML",
-          "xml"
-        ],
-        "extensions": [
-          ".xml"
-        ]
+        "command": "tei-xml-fmt.helloWorld",
+        "title": "Hello World"
       }
     ]
   },
@@ -42,20 +34,16 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@types/vscode": "^1.107.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "@types/vscode": "^1.104.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
-    "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.25.9",
     "eslint": "^9.34.0",
+    "esbuild": "^0.25.9",
     "npm-run-all": "^4.1.5",
-    "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "he": "^1.2.0",
-    "saxes": "^6.0.0"
+    "typescript": "^5.9.2",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2"
   }
 }
