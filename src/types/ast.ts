@@ -1,5 +1,5 @@
 // All types of visitable nodes
-export type ASTNode = DocumentNode | TagNode | CloseTagNode | TextNode;
+export type ASTNode = DocumentNode | TagNode | CloseTagNode | TextNode | SpacePossibleNode;
 
 interface BaseNode {
     parent?: ParentNode | null;
@@ -9,13 +9,13 @@ export interface ParentNode {
     children: ASTNode[];
 }
 
-export class DocumentNode implements BaseNode {
+export class DocumentNode implements BaseNode, ParentNode {
     parent = null;
     children: ASTNode[] = [];
 }
 
 // Tags such as <p> and <hi>
-export class TagNode implements BaseNode {
+export class TagNode implements BaseNode, ParentNode {
     parent: ParentNode;
     name: string;
     attributes: Record<string, string>;
