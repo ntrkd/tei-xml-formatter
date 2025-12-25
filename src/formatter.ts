@@ -27,7 +27,9 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             let parent: ParentNode = stack[stack.length - 1];
             let node: TagNode = new TagNode(tag.name, tag.attributes, tag.isSelfClosing, parent);
             parent.children.push(node);
-            stack.push(node);
+            if (!tag.isSelfClosing) {
+                stack.push(node);
+            }
         });
 
         saxes.on("closetag", function(tag) {
@@ -42,9 +44,10 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         });
 
         saxes.on("text", function(text) {
-            if (!inPLike) {
-                text = text.replace(/^[\s\t\n]+|[\s\t\n]+$|[\n\t]+/g, '');
-            }
+            // if (!inPLike) {
+                // text = text.replace(/^[\s\t\n]+|[\s\t\n]+$|[\n\t]+/g, '');
+            // }
+            // text = text.replace(/[\n\t ]+/g, ' ');
 
             if (text !== "") {
                 let parent: ParentNode = stack[stack.length - 1];
