@@ -61,3 +61,13 @@ export class TextNode implements BaseNode {
         this.parent = parent;
     }
 }
+
+export class SpacePossibleNode implements BaseNode {
+    parent: ParentNode;
+
+    constructor(
+        parent: ParentNode
+    ) {
+        this.parent = parent;
+    }
+}

@@ -1,11 +1,25 @@
 import { SaxesParser } from 'saxes';
-import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode } from './types/ast';
+import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode, SpacePossibleNode } from './types/ast';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine, FMTNode, Wrap } from './types/fmt';
 import * as vscode from 'vscode';
 import { platform } from 'os';
+import { emit } from 'process';
+import { json } from 'stream/consumers';
 
 // Define what tags are considered <p> like
 const pLike: string[] = ["head", "p"];
+
+const block: string[] = ["head", "p", "div", "body", "text", "TEI"];
+const inline: string[] = ["hi", "note", "salute", "signed"];
+const blockTags = new Set([
+    "p", "div", "section", "article", "ul", "ol", "li",
+    "table", "tr", "td", "th", "blockquote", "head", "text", "TEI", "bod"
+]);
+
+interface Carry {
+  left: boolean;
+  right: boolean;
+}
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TextEdit[]> {
@@ -57,7 +71,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
         saxes.write(document.getText()).close();
 
-        console.log(xmlDoc.children.length);
         let fmtTree = this.builder(xmlDoc);
 
         const folder = vscode.workspace.workspaceFolders?.[0];
@@ -76,15 +89,216 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         const formatted = vscode.Uri.joinPath(folder.uri, "formatted.xml");
         vscode.workspace.fs.writeFile(formatted, Buffer.from(this.generate(fmtTree, 'Detect', 0)));
 
+        const sanitized = this.sanitizeAST(xmlDoc);
+        const sanitizeOutput = vscode.Uri.joinPath(folder.uri, "sanitized.json");
+        vscode.workspace.fs.writeFile(sanitizeOutput, Buffer.from(this.serializeNode(sanitized)));
+
+        const newFmtTree = this.builder(sanitized); 
+        const newFmt = vscode.Uri.joinPath(folder.uri, "newfmt.json");
+        vscode.workspace.fs.writeFile(newFmt, Buffer.from(this.serializeFmt(newFmtTree)));
+        const generatedString = this.generate(newFmtTree, 'Detect', 0);
+        const newO = vscode.Uri.joinPath(folder.uri, "newoutput.xml");
+        vscode.workspace.fs.writeFile(newO, Buffer.from(generatedString));
+
+
+        this.emitter(xmlDoc);
+
         return;
+    }
+
+    isPureSpace(text: string) {
+    return /^[\s]+$/.test(text);
+    }
+
+    hasLeftSpace(text: string) {
+    return /^\s/.test(text);
+    }
+
+    hasRightSpace(text: string) {
+    return /\s$/.test(text);
+    }
+
+    stripLeft(text: string) {
+    return text.replace(/^\s+/, "");
+    }
+
+    stripRight(text: string) {
+    return text.replace(/\s+$/, "");
+    }
+
+    sanitizeAST(root: DocumentNode): DocumentNode {
+        this.sanitizeParent(root);
+        return root;
+    }
+
+    sanitizeParent(parent: ParentNode) {
+        let carryRight = false;
+        const newChildren: ASTNode[] = [];
+
+        for (let i = 0; i < parent.children.length; i++) {
+            const child = parent.children[i];
+
+            const { node, carry } = this.sanitizeNode(child, parent, carryRight);
+
+            // insert carried-left space before node
+            if (carry.left) {
+            newChildren.push(new SpacePossibleNode(parent));
+            }
+
+            newChildren.push(node);
+
+            carryRight = carry.right;
+        }
+
+        // trailing carried-right space dies at container boundary
+        parent.children = newChildren;
+    }
+
+    sanitizeNode(
+        node: ASTNode,
+        parent: ParentNode,
+        carryIn: boolean
+        ): { node: ASTNode; carry: { left: boolean; right: boolean } } {
+
+        // ─────────────────────────────────────────────
+        // TEXT NODE
+        // ─────────────────────────────────────────────
+        if (node instanceof TextNode) {
+            let text = node.text;
+            let carryLeft = false;
+            let carryRight = false;
+
+            // incoming carry meets text
+            if (carryIn && this.hasLeftSpace(text)) {
+            text = this.stripLeft(text);
+            carryLeft = false;
+            carryRight = false;
+            return {
+                node: new TextNode(text, parent),
+                carry: { left: false, right: false }
+            };
+            }
+
+            // pure spacing → carry both sides
+            if (this.isPureSpace(text)) {
+            return {
+                node: new TextNode("", parent),
+                carry: { left: true, right: true }
+            };
+            }
+
+            // leading space
+            if (this.hasLeftSpace(text)) {
+            text = this.stripLeft(text);
+            carryLeft = true;
+            }
+
+            // trailing space
+            if (this.hasRightSpace(text)) {
+            text = this.stripRight(text);
+            carryRight = true;
+            }
+
+            return {
+            node: new TextNode(text, parent),
+            carry: { left: carryLeft, right: carryRight }
+            };
+        }
+
+        // ─────────────────────────────────────────────
+        // TAG NODE
+        // ─────────────────────────────────────────────
+        if (node instanceof TagNode) {
+            this.sanitizeParent(node);
+
+            // block tag kills all carry
+            if (blockTags.has(node.name)) {
+            return {
+                node,
+                carry: { left: false, right: false }
+            };
+            }
+
+            // carry-right hitting open tag → stop and insert
+            if (carryIn) {
+            return {
+                node,
+                carry: { left: true, right: false }
+            };
+            }
+
+            return {
+            node,
+            carry: { left: false, right: false }
+            };
+        }
+
+        // ─────────────────────────────────────────────
+        // CLOSE TAG
+        // ─────────────────────────────────────────────
+        if (node instanceof CloseTagNode) {
+            // carry-left hitting close tag → stop and insert
+            if (carryIn) {
+            return {
+                node,
+                carry: { left: false, right: true }
+            };
+            }
+
+            return {
+            node,
+            carry: { left: false, right: false }
+            };
+        }
+
+        // ─────────────────────────────────────────────
+        // FALLTHROUGH
+        // ─────────────────────────────────────────────
+        return {
+            node,
+            carry: { left: false, right: false }
+        };
+    }
+
+    emitter(astRoot: DocumentNode): Group {
+        if (astRoot.children.length === 0) { return new Group([]); } // undefined check
+
+        let holdingStack: ASTNode[] = [astRoot];
+        let postOrderStack: ASTNode[] = [];
+
+        while (holdingStack.length > 0) {
+            let popped: ASTNode = holdingStack.pop()!;
+            postOrderStack.push(popped);
+
+            if (this.isParentNode(popped)) {
+                popped.children.forEach(child => {
+                    holdingStack.push(child);
+                });
+            }
+        }
+
+        while (postOrderStack.length > 0) {
+            let elem = postOrderStack.pop()!;
+            if (elem instanceof TagNode) {
+                console.log(postOrderStack.length, elem.name);
+            }
+            if (elem instanceof CloseTagNode) {
+                console.log(postOrderStack.length, elem.name);
+            }
+            if (elem instanceof TextNode) {
+                console.log(postOrderStack.length, JSON.stringify(elem.text));
+            }
+            if (elem instanceof DocumentNode) {
+                console.log("Document");
+            }
+        }
+
+        return new Group([]);
     }
 
     // Iterative pre order DFS
     builder(astRoot: DocumentNode): Group {
-        console.log(astRoot.children.length);
         if (astRoot.children.length === 0) { return new Group([]); } // undefined check
-
-        let inPLike: boolean = false;
 
         const fmtRoot: Group = new Group([]);
         const fmtStack: Group[] = [fmtRoot];
@@ -110,60 +324,41 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                     tagBody += ">";
                 }
 
+                if (blockTags.has(node.name)) {
+                    parent.nodes.push(new Line());
+                }
+
                 tagGroup.nodes.push(new Text(tagBody));
+
+                if (blockTags.has(node.name)) {
+                    tagGroup.nodes.push(new LineIndent());
+                }
+
                 parent.nodes.push(tagGroup);
                 if (!node.selfClosing) {
                     fmtStack.push(tagGroup);
-                }
-
-                // Push line nodes for spacing
-                if (!inPLike) {
-                    let nextNode: ASTNode = this.peekNextASTNode(node, astStack);
-                    if (nextNode instanceof CloseTagNode) {
-                        tagGroup.nodes.push(new Line());
-                    } else {
-                        tagGroup.nodes.push(new LineIndent());
-                    }
-                }
-
-                if (pLike.includes(node.name)) {
-                    inPLike = true;
                 }
             } else if (node instanceof CloseTagNode) {
                 let closeTag: string = `</${node.name}>`;
                 let parent: Group = fmtStack[fmtStack.length - 1];
                 let grandParent: Group = fmtStack[fmtStack.length - 2];
 
-                if (pLike.includes(node.name)) {
-                    inPLike = false;
-                    if (node.parent.children.length > 1) {
-                        parent.nodes.push(new LineDeindent());
-                    }
+                if (blockTags.has(node.name)) {
+                    parent.nodes.push(new LineDeindent());
                 }
 
                 parent.nodes.push(new Text(closeTag));
                 fmtStack.pop();
 
-                if (!inPLike) {
-                    let nextNode: ASTNode = this.peekNextASTNode(node, astStack);
-                    if (nextNode instanceof CloseTagNode) {
-                        grandParent.nodes.push(new LineDeindent());
-                    } else {
-                        grandParent.nodes.push(new Line());
-                    }
+                if (blockTags.has(node.name)) {
+                    grandParent.nodes.push(new Line());
                 }
             } else if (node instanceof TextNode) {
-                fmtStack[fmtStack.length - 1].nodes.push(new Text(node.text));
-                if (!inPLike) {
-                    let nextNode: ASTNode = this.peekNextASTNode(node, astStack);
-                    let parent: Group = fmtStack[fmtStack.length - 1];
-
-                    if (nextNode instanceof CloseTagNode) {
-                        parent.nodes.push(new LineDeindent());
-                    } else if (nextNode instanceof TagNode) {
-                        parent.nodes.push(new Line());
-                    }
+                if (node.text !== "") {
+                    fmtStack[fmtStack.length - 1].nodes.push(new Text(node.text));
                 }
+            } else if (node instanceof SpacePossibleNode) {
+                fmtStack[fmtStack.length - 1].nodes.push(new Line());
             } else if (node instanceof DocumentNode) {
                 // Do nothing, we wait for children to be loaded into the stack
             }
@@ -192,14 +387,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
     }
 
     generate(fmtTreeRoot: FMTNode, wrap: Wrap, indent: number): string {
-        if (fmtTreeRoot instanceof Group) {
-            if (fmtTreeRoot.nodes[0].kind === "Text") {
-                if (fmtTreeRoot.nodes[0].text === "<title>") {
-                    console.log("");
-                }
-            }
-        }
-
         // If the parent Group node is NoWrap all child group nodes inherit it.
         // If the parent Group node is Detect or Wrap, the child Group needs to determine its own Wrap mode
 
@@ -281,10 +468,26 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
     }
 
     serializeNode(node: ASTNode): string {
-        // Custom replacer to skip the parent property
-        return JSON.stringify(node, (key, value) => {
-            if (key === 'parent') { return undefined; } // skip circular reference
+    return JSON.stringify(
+        node,
+        (key, value) => {
+            // Remove circular reference
+            if (key === 'parent') { return undefined; };
+
+            // Inject instance name for AST nodes
+            if (value && typeof value === 'object') {
+                const ctor = value.constructor;
+                if (ctor && ctor !== Object) {
+                    return {
+                        _type: ctor.name,
+                        ...value
+                    };
+                }
+            }
+
             return value;
-        }, 2); // 2-space indentation for readability
-    }
+        },
+        2
+    );
+}
 }
