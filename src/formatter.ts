@@ -2,22 +2,15 @@ import { SaxesParser } from 'saxes';
 import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode, SpacePossibleNode } from './types/ast';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine, FMTNode, Wrap } from './types/fmt';
 import * as vscode from 'vscode';
-import { platform } from 'os';
-import { emit } from 'process';
-import { json } from 'stream/consumers';
 
 // Define what tags are considered <p> like
 const pLike: string[] = ["head", "p"];
 
-const block: string[] = ["head", "p", "div", "body", "text", "TEI"];
+const block: string[] = ["head", "p", "div", "body", "text", "TEI", "section"];
 const inline: string[] = ["hi", "note", "salute", "signed"];
-const blockTags = new Set([
-    "p", "div", "section", "article", "ul", "ol", "li",
-    "table", "tr", "td", "th", "blockquote", "head", "text", "TEI", "bod"
-]);
 
-interface Carry {
-  left: boolean;
+type Carry = {
+    left: boolean;
   right: boolean;
 }
 
@@ -71,7 +64,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
         saxes.write(document.getText()).close();
 
-        let fmtTree = this.builder(xmlDoc);
 
         const folder = vscode.workspace.workspaceFolders?.[0];
         if (!folder) {
@@ -83,217 +75,180 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         const dd = this.serializeNode(xmlDoc);
         vscode.workspace.fs.writeFile(astFile, Buffer.from(dd));
 
-        const fmtFile = vscode.Uri.joinPath(folder.uri, "fmt.json");
-        vscode.workspace.fs.writeFile(fmtFile, Buffer.from(this.serializeFmt(fmtTree)));
-
-        const formatted = vscode.Uri.joinPath(folder.uri, "formatted.xml");
-        vscode.workspace.fs.writeFile(formatted, Buffer.from(this.generate(fmtTree, 'Detect', 0)));
-
-        const sanitized = this.sanitizeAST(xmlDoc);
-        const sanitizeOutput = vscode.Uri.joinPath(folder.uri, "sanitized.json");
-        vscode.workspace.fs.writeFile(sanitizeOutput, Buffer.from(this.serializeNode(sanitized)));
-
-        const newFmtTree = this.builder(sanitized); 
-        const newFmt = vscode.Uri.joinPath(folder.uri, "newfmt.json");
-        vscode.workspace.fs.writeFile(newFmt, Buffer.from(this.serializeFmt(newFmtTree)));
-        const generatedString = this.generate(newFmtTree, 'Detect', 0);
-        const newO = vscode.Uri.joinPath(folder.uri, "newoutput.xml");
-        vscode.workspace.fs.writeFile(newO, Buffer.from(generatedString));
+        this.mergeAdjacentTextNodes(xmlDoc);
+        const sanitizedFile = vscode.Uri.joinPath(folder.uri, "sanitized.json");
+        let saniReturn = this.sanitizer(xmlDoc, { left: false, right: false });
+        let saniRoot: ASTNode = saniReturn[0][0];
+        vscode.workspace.fs.writeFile(sanitizedFile, Buffer.from(this.serializeNode(saniRoot)));
 
 
-        this.emitter(xmlDoc);
+        if (saniRoot instanceof DocumentNode) {
+            let fmtTree = this.builder(saniRoot);
+            const fmtFile = vscode.Uri.joinPath(folder.uri, "fmt.json");
+            vscode.workspace.fs.writeFile(fmtFile, Buffer.from(this.serializeFmt(fmtTree)));
+
+            const formatted = vscode.Uri.joinPath(folder.uri, "formatted.xml");
+            vscode.workspace.fs.writeFile(formatted, Buffer.from(this.generate(fmtTree, 'Detect', 0)));
+        }
 
         return;
     }
+    
+    sanitizer(node: ASTNode, spaceCarry: Carry): [ASTNode[], Carry] {
+        let returnCarry = spaceCarry; // Is this necessary? Or should we set to false
+        let nextChildCarry = { left: false, right: false };
+        let childs: ASTNode[] = [];
 
-    isPureSpace(text: string) {
-    return /^[\s]+$/.test(text);
-    }
+        // visit child and construct child array if we have children
+        if (this.isParentNode(node)) {
+            for (let i = 0; i < node.children.length; i++) {
+                let sanitizedReturn = this.sanitizer(node.children[i], nextChildCarry);
 
-    hasLeftSpace(text: string) {
-    return /^\s/.test(text);
-    }
+                // Realize the left carry as a possible space
+                if (sanitizedReturn[1].left && i !== 0) {
+                    childs.push(new SpacePossibleNode(null));
+                }
 
-    hasRightSpace(text: string) {
-    return /\s$/.test(text);
-    }
+                // If we are the first child, then the left carry needs to be a return arg
+                if (i === 0) {
+                    returnCarry.left = sanitizedReturn[1].left;
+                }
 
-    stripLeft(text: string) {
-    return text.replace(/^\s+/, "");
-    }
-
-    stripRight(text: string) {
-    return text.replace(/\s+$/, "");
-    }
-
-    sanitizeAST(root: DocumentNode): DocumentNode {
-        this.sanitizeParent(root);
-        return root;
-    }
-
-    sanitizeParent(parent: ParentNode) {
-        let carryRight = false;
-        const newChildren: ASTNode[] = [];
-
-        for (let i = 0; i < parent.children.length; i++) {
-            const child = parent.children[i];
-
-            const { node, carry } = this.sanitizeNode(child, parent, carryRight);
-
-            // insert carried-left space before node
-            if (carry.left) {
-            newChildren.push(new SpacePossibleNode(parent));
-            }
-
-            newChildren.push(node);
-
-            carryRight = carry.right;
-        }
-
-        // trailing carried-right space dies at container boundary
-        parent.children = newChildren;
-    }
-
-    sanitizeNode(
-        node: ASTNode,
-        parent: ParentNode,
-        carryIn: boolean
-        ): { node: ASTNode; carry: { left: boolean; right: boolean } } {
-
-        // ─────────────────────────────────────────────
-        // TEXT NODE
-        // ─────────────────────────────────────────────
-        if (node instanceof TextNode) {
-            let text = node.text;
-            let carryLeft = false;
-            let carryRight = false;
-
-            // incoming carry meets text
-            if (carryIn && this.hasLeftSpace(text)) {
-            text = this.stripLeft(text);
-            carryLeft = false;
-            carryRight = false;
-            return {
-                node: new TextNode(text, parent),
-                carry: { left: false, right: false }
-            };
-            }
-
-            // pure spacing → carry both sides
-            if (this.isPureSpace(text)) {
-            return {
-                node: new TextNode("", parent),
-                carry: { left: true, right: true }
-            };
-            }
-
-            // leading space
-            if (this.hasLeftSpace(text)) {
-            text = this.stripLeft(text);
-            carryLeft = true;
-            }
-
-            // trailing space
-            if (this.hasRightSpace(text)) {
-            text = this.stripRight(text);
-            carryRight = true;
-            }
-
-            return {
-            node: new TextNode(text, parent),
-            carry: { left: carryLeft, right: carryRight }
-            };
-        }
-
-        // ─────────────────────────────────────────────
-        // TAG NODE
-        // ─────────────────────────────────────────────
-        if (node instanceof TagNode) {
-            this.sanitizeParent(node);
-
-            // block tag kills all carry
-            if (blockTags.has(node.name)) {
-            return {
-                node,
-                carry: { left: false, right: false }
-            };
-            }
-
-            // carry-right hitting open tag → stop and insert
-            if (carryIn) {
-            return {
-                node,
-                carry: { left: true, right: false }
-            };
-            }
-
-            return {
-            node,
-            carry: { left: false, right: false }
-            };
-        }
-
-        // ─────────────────────────────────────────────
-        // CLOSE TAG
-        // ─────────────────────────────────────────────
-        if (node instanceof CloseTagNode) {
-            // carry-left hitting close tag → stop and insert
-            if (carryIn) {
-            return {
-                node,
-                carry: { left: false, right: true }
-            };
-            }
-
-            return {
-            node,
-            carry: { left: false, right: false }
-            };
-        }
-
-        // ─────────────────────────────────────────────
-        // FALLTHROUGH
-        // ─────────────────────────────────────────────
-        return {
-            node,
-            carry: { left: false, right: false }
-        };
-    }
-
-    emitter(astRoot: DocumentNode): Group {
-        if (astRoot.children.length === 0) { return new Group([]); } // undefined check
-
-        let holdingStack: ASTNode[] = [astRoot];
-        let postOrderStack: ASTNode[] = [];
-
-        while (holdingStack.length > 0) {
-            let popped: ASTNode = holdingStack.pop()!;
-            postOrderStack.push(popped);
-
-            if (this.isParentNode(popped)) {
-                popped.children.forEach(child => {
-                    holdingStack.push(child);
+                // Push the child into the parent
+                sanitizedReturn[0].forEach(function (elem) {
+                    childs.push(elem);
                 });
+
+                // We only carry the space to the next node if it is a close tag
+                let j = i + 1;
+                let rightCarried: boolean = false;
+                if (j < node.children.length && node.children[j] instanceof CloseTagNode) {
+                    nextChildCarry.right = sanitizedReturn[1].right;
+                    rightCarried = true;
+                }
+
+                // If the right space has not been carried then realize it as a space
+                if (!rightCarried) {
+                    // We aren't the last node and its an inline TagNode
+                    if (j < node.children.length && node.children[j] instanceof TagNode && !block.includes(node.children[j].name) && !(childs[childs.length - 1] instanceof SpacePossibleNode)) {
+                        childs.push(new SpacePossibleNode(null));
+                    }
+
+                    // We are the last node
+                    if (j === node.children.length) {
+                        returnCarry.right = sanitizedReturn[1].right;
+                    }
+                }
             }
         }
 
-        while (postOrderStack.length > 0) {
-            let elem = postOrderStack.pop()!;
-            if (elem instanceof TagNode) {
-                console.log(postOrderStack.length, elem.name);
+        // visit the current node
+        if (node instanceof TagNode) {
+            if (node.name === "TEI") {
+                console.log('h');
             }
-            if (elem instanceof CloseTagNode) {
-                console.log(postOrderStack.length, elem.name);
+            // If its a block tag the carry space will be consumed
+            // Else we return it as a carry space
+            if (block.includes(node.name)) {
+                returnCarry.left = false;
+                returnCarry.right = false;
             }
-            if (elem instanceof TextNode) {
-                console.log(postOrderStack.length, JSON.stringify(elem.text));
+
+            // Return with return carry and the new parent node
+            let returnArr: ASTNode[] = [];
+            let tagNode: TagNode = new TagNode(node.name, node.attributes, node.selfClosing, null);
+
+            // Push the children into the new node
+            for (let i = 0; i < childs.length; i++) {
+                tagNode.children.push(childs[i]);
             }
-            if (elem instanceof DocumentNode) {
-                console.log("Document");
+
+            // If the carry right / left is true add a space node on the right and left
+            if (returnCarry.left) {
+                returnArr.push(new SpacePossibleNode(null));
+            }
+
+            returnArr.push(tagNode);
+
+            if (returnCarry.right) {
+                returnArr.push(new SpacePossibleNode(null));
+            }
+
+            return [returnArr, returnCarry];
+        } else if (node instanceof CloseTagNode) {
+            let tagNode: CloseTagNode = new CloseTagNode(node.name, null);
+
+            // If block node return carry false
+            // Else return carry on the right 
+            if (block.includes(node.name)) {
+                returnCarry.left = false;
+                returnCarry.right = false;
+            }
+
+            return [[tagNode], returnCarry];
+        } else if (node instanceof TextNode) {
+            if (node.text.includes("808")) {
+                console.log('h');
+            }
+
+            // normalize spacing in the center
+            let text: string = node.text.replace(/[\s\n\t]+/g, ' ');
+
+            // if there are spaces on either end then trim them and insert space possible there then return the correct carry direction
+            if (text.charAt(0) === ' ') {
+                returnCarry.left = true;
+            }
+
+            if (text.charAt(text.length - 1) === ' ') {
+                returnCarry.right = true;
+            }
+
+            text = text.trim();
+
+            if (text === '') {
+                return [[], returnCarry];
+            } else {
+                return [[new TextNode(text, null)], returnCarry];
+            }
+
+        } else if (node instanceof DocumentNode) {
+            // Create an empty parent and add child to it
+            let doc: DocumentNode = new DocumentNode();
+
+            for (let i = 0; i < childs.length; i++) {
+                doc.children.push(childs[i]);
+            }
+            
+            return [[doc], returnCarry];
+        }
+
+        // TODO panic
+        return [[], { left: false, right: false }];
+    }
+
+    mergeAdjacentTextNodes(parent: ParentNode) {
+        const merged: ASTNode[] = [];
+
+        for (const node of parent.children) {
+            const last = merged[merged.length - 1];
+
+            if (last instanceof TextNode && node instanceof TextNode) {
+                // Merge text into the previous TextNode
+                last.text += node.text;
+            } else {
+                merged.push(node);
+                node.parent = parent;
             }
         }
 
-        return new Group([]);
+        parent.children = merged;
+
+        // Recurse into child ParentNodes
+        for (const node of parent.children) {
+            if (this.isParentNode(node)) {
+                this.mergeAdjacentTextNodes(node);
+            }
+        }
     }
 
     // Iterative pre order DFS
@@ -305,6 +260,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
         const astStack: ASTNode[] = [astRoot];
 
+        // Never insert spacing before this node
         while (astStack.length > 0) {
             const node = astStack.pop();
 
@@ -324,14 +280,19 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                     tagBody += ">";
                 }
 
-                if (blockTags.has(node.name)) {
-                    parent.nodes.push(new Line());
-                }
-
                 tagGroup.nodes.push(new Text(tagBody));
 
-                if (blockTags.has(node.name)) {
-                    tagGroup.nodes.push(new LineIndent());
+                if (block.includes(node.name)) {
+                    if (!node.selfClosing) {
+                        let nextTag = this.peekNextASTNode(node, astStack);
+                        if (nextTag instanceof CloseTagNode) {
+                            tagGroup.nodes.push(new Line());
+                        } else {
+                            tagGroup.nodes.push(new LineIndent());
+                        }
+                    } else {
+                        tagGroup.nodes.push(new Line());
+                    }
                 }
 
                 parent.nodes.push(tagGroup);
@@ -343,22 +304,31 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 let parent: Group = fmtStack[fmtStack.length - 1];
                 let grandParent: Group = fmtStack[fmtStack.length - 2];
 
-                if (blockTags.has(node.name)) {
-                    parent.nodes.push(new LineDeindent());
-                }
-
                 parent.nodes.push(new Text(closeTag));
                 fmtStack.pop();
 
-                if (blockTags.has(node.name)) {
+                let nextTag = this.peekNextASTNode(node, astStack);
+                if (block.includes(node.name) 
+                    || (nextTag instanceof TagNode && block.includes(nextTag.name))) {
                     grandParent.nodes.push(new Line());
+                } else if (nextTag instanceof CloseTagNode && block.includes(nextTag.name)) {
+                    grandParent.nodes.push(new LineDeindent());
                 }
             } else if (node instanceof TextNode) {
+                let parent: Group = fmtStack[fmtStack.length - 1];
+
                 if (node.text !== "") {
                     fmtStack[fmtStack.length - 1].nodes.push(new Text(node.text));
                 }
+
+                let nextTag = this.peekNextASTNode(node, astStack);
+                if (nextTag instanceof TagNode && block.includes(nextTag.name)) {
+                    parent.nodes.push(new Line());
+                } else if (nextTag instanceof CloseTagNode && block.includes(nextTag.name)) {
+                    parent.nodes.push(new LineDeindent());
+                }
             } else if (node instanceof SpacePossibleNode) {
-                fmtStack[fmtStack.length - 1].nodes.push(new Line());
+                fmtStack[fmtStack.length - 1].nodes.push(new SpaceOrLine());
             } else if (node instanceof DocumentNode) {
                 // Do nothing, we wait for children to be loaded into the stack
             }
@@ -468,26 +438,26 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
     }
 
     serializeNode(node: ASTNode): string {
-    return JSON.stringify(
-        node,
-        (key, value) => {
-            // Remove circular reference
-            if (key === 'parent') { return undefined; };
+        return JSON.stringify(
+            node,
+            (key, value) => {
+                // Remove circular reference
+                if (key === 'parent') { return undefined; };
 
-            // Inject instance name for AST nodes
-            if (value && typeof value === 'object') {
-                const ctor = value.constructor;
-                if (ctor && ctor !== Object) {
-                    return {
-                        _type: ctor.name,
-                        ...value
-                    };
+                // Inject instance name for AST nodes
+                if (value && typeof value === 'object') {
+                    const ctor = value.constructor;
+                    if (ctor && ctor !== Object) {
+                        return {
+                            _type: ctor.name,
+                            ...value
+                        };
+                    }
                 }
-            }
 
-            return value;
-        },
-        2
-    );
-}
+                return value;
+            },
+            2
+        );
+    }
 }

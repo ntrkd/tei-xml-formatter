@@ -16,7 +16,7 @@ export class DocumentNode implements BaseNode, ParentNode {
 
 // Tags such as <p> and <hi>
 export class TagNode implements BaseNode, ParentNode {
-    parent: ParentNode;
+    parent: ParentNode | null;
     name: string;
     attributes: Record<string, string>;
     children: ASTNode[] = [];
@@ -26,7 +26,7 @@ export class TagNode implements BaseNode, ParentNode {
         name: string,
         attributes: Record<string, string>,
         selfClosing: boolean,
-        parent: ParentNode
+        parent: ParentNode | null
     ) {
         this.name = name;
         this.attributes = attributes;
@@ -36,12 +36,12 @@ export class TagNode implements BaseNode, ParentNode {
 }
 
 export class CloseTagNode implements BaseNode {
-    parent: ParentNode;
+    parent: ParentNode | null;
     name: string;
     
     constructor(
         name: string,
-        parent: ParentNode
+        parent: ParentNode | null
     ) {
         this.name = name;
         this.parent = parent;
@@ -51,22 +51,23 @@ export class CloseTagNode implements BaseNode {
 
 export class TextNode implements BaseNode {
     text: string;
-    parent: ParentNode;
+    parent: ParentNode | null;
 
     constructor(
         text: string,
-        parent: ParentNode
+        parent: ParentNode | null
     ) {
         this.text = text;
         this.parent = parent;
     }
 }
 
+// Inserted only after sanitizing the AST tree
 export class SpacePossibleNode implements BaseNode {
-    parent: ParentNode;
+    parent: ParentNode | null;
 
     constructor(
-        parent: ParentNode
+        parent: ParentNode | null
     ) {
         this.parent = parent;
     }
