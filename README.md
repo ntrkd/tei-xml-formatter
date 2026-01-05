@@ -9,6 +9,8 @@ Yorick Peterse - [How to write a code formatter](https://yorickpeterse.com/artic
 
 Gerard Huet - [The Zipper](https://gallium.inria.fr/~huet/PUBLIC/zip.pdf)
 
+TEI Council - [TEI Specification](https://tei-c.org/release/doc/tei-p5-doc/en/html/index.html)
+
 ## Definitions and Observations
 
 - TEI XML prefers explicit spacing. It defines no standards for how implict spaces are treated. Thus these formatting rules are specific to the renderer used in the Eartha M. M. White project. I would recommend using explicit spacing wherever possible.
