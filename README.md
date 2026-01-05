@@ -1,6 +1,4 @@
-## !Important
-
-This project is under active development and is not ready for use.
+> This project is under active development and is not ready for use.
 
 ## What is this?
 
@@ -60,3 +58,56 @@ Gerard Huet - [The Zipper](https://gallium.inria.fr/~huet/PUBLIC/zip.pdf)
 7. Generate the final XML using the formatting tree.
 
     a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
+
+## Most Recent Prototype Formatting Demonstration
+The current code was quickly written to see how parts of the algorithm above would function and to spot weaknesses. The output is shown below.
+
+### Unformatted
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="custom.xsl"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+<text><body><div type="letter">
+<head>Letter from Emily to John</head><p><hi rend="italic">Dear John,</hi><lb/> I hope this letter finds you well.
+The weather here has been <hi rend="bold">unusually warm</hi> for October.
+</p><p>I have enclosed the sketches you asked for.
+<note type="editorial">Original note: “See attached drawings.”</note></p>
+<closer><salute> Yours sincerely, </salute>
+<signed>Emily</signed>
+</closer></div><hi> 80 808 0808 080808080808 0808008 8 8 08 08 08 80 80 80 8080 8080 8008 080 8080 8080 080 0
+</hi></body></text></TEI>
+```
+### Formatted
+
+More XML documents will be tested later, but for now work on getting this example to near-perfection. The main issues currently are, intersection between an open/close tag having multiple SpacingNodes pile up casuing those multi-line gaps. Indentation for open/close tags needs to be checked more thoroughly during Formatting tree generation. Current algorithm specification should fix both. However, current algorithm spec does not deal with only having one set of relating spaces render when no wrap is needed. This causes the space between every node as seen in the <closer> tag.
+```xml
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+	<text>
+		<body>
+			<div type="letter">
+				<head>Letter from Emily to John</head>
+				<p>
+					<hi rend="italic">Dear John,</hi>
+					<lb/>
+					I hope this letter finds you well. The weather here has been
+					<hi rend="bold">unusually warm</hi>
+					for October.
+				</p>
+				<p>
+					I have enclosed the sketches you asked for.
+					<note type="editorial">Original note: “See attached drawings.”</note>
+				</p>
+				
+				
+				
+				<closer> <salute>Yours sincerely, </salute>  <signed>Emily</signed>  </closer>
+				</div>
+			
+			
+			
+			<hi>80 808 0808 080808080808 0808008 8 8 08 08 08 80 80 80 8080 8080 8008 080 8080 8080 080 0
+			</hi>
+			</body>
+		</text>
+	</TEI>
+```
