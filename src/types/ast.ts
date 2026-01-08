@@ -1,73 +1,113 @@
-// All types of visitable nodes
-export type ASTNode = DocumentNode | TagNode | CloseTagNode | TextNode | SpacePossibleNode;
+// Rewrite v2.0 of AST node types.
+// Requirements, all nodes must be editable at any point.
 
-interface BaseNode {
-    parent?: ParentNode | null;
+// One type for AST Nodes - Includes Parent Nodes. All nodes must have the parent field except for DocumentNode.
+export type ASTNode = DocumentNode
+    | TagNode
+    | CloseTagNode
+    | TextNode
+    | SpacingNode;
+
+export interface BaseNode {
+    parent: ParentNode | null;
 }
 
-export interface ParentNode {
+// ParentNode interface
+export interface ParentNode extends BaseNode {
+    parent: ParentNode | null;
     children: ASTNode[];
+
+    /**
+     * Ensure every child node has the parent set to this instance
+     */
+    attachChildren(): void;
 }
 
-export class DocumentNode implements BaseNode, ParentNode {
-    parent = null;
+export abstract class BaseParentNode implements ParentNode {
+    parent: ParentNode | null = null;
     children: ASTNode[] = [];
+
+    attachChildren() {
+        for (const child of this.children) {
+            child.parent = this;
+        }
+    }
 }
 
-// Tags such as <p> and <hi>
-export class TagNode implements BaseNode, ParentNode {
-    parent: ParentNode | null;
+export function isParentNode(node: BaseNode): node is ParentNode {
+    return Array.isArray((node as any).children);
+}
+
+// A DocumentNode - A Parent Node. Must be the root of the tree.
+export class DocumentNode extends BaseParentNode {
+    constructor(
+        children: ASTNode[] = []
+    ) {
+        super();
+
+        this.parent = null;
+        this.children = children;
+        this.attachChildren();
+    }
+}
+
+// Tag Node - A Parent Node. Contains a Close Tag Node as its last child unless selfClose = true
+export class TagNode extends BaseParentNode {
     name: string;
-    attributes: Record<string, string>;
-    children: ASTNode[] = [];
     selfClosing: boolean;
+    attributes: Record<string, string>;
 
     constructor(
         name: string,
-        attributes: Record<string, string>,
         selfClosing: boolean,
-        parent: ParentNode | null
+        attributes: Record<string, string>,
+        children: ASTNode[] = [],
+        parent: ParentNode | null = null
     ) {
+        super();
+
         this.name = name;
-        this.attributes = attributes;
         this.selfClosing = selfClosing;
+        this.attributes = attributes;
         this.parent = parent;
+        this.children = children;
     }
 }
 
+// Close Tag Node - Only inserted on non-self closing tags. Always the last child.
 export class CloseTagNode implements BaseNode {
-    parent: ParentNode | null;
     name: string;
-    
+    parent: ParentNode | null;
+
     constructor(
         name: string,
-        parent: ParentNode | null
+        parent: ParentNode | null = null
     ) {
         this.name = name;
         this.parent = parent;
     }
-
 }
 
+// Text Node - Contains a single field of type string which is editable after initialization.
 export class TextNode implements BaseNode {
     text: string;
     parent: ParentNode | null;
 
     constructor(
         text: string,
-        parent: ParentNode | null
+        parent: ParentNode | null = null
     ) {
         this.text = text;
         this.parent = parent;
     }
 }
 
-// Inserted only after sanitizing the AST tree
-export class SpacePossibleNode implements BaseNode {
+// Spacing Node - A placeholder for where spaces can be inserted.
+export class SpacingNode implements BaseNode {
     parent: ParentNode | null;
 
     constructor(
-        parent: ParentNode | null
+        parent: ParentNode | null = null
     ) {
         this.parent = parent;
     }
