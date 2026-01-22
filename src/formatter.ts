@@ -50,8 +50,14 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
             if (text !== "") {
                 let parent: ParentNode = stack[stack.length - 1];
-                parent.children.push(new TextNode(text, parent));
-            }
+                let previousNode: ASTNode = parent.children[parent.children.length - 1];
+
+                if (previousNode instanceof TextNode) {
+                    let joinedProcessedText = (previousNode.text + text).replace(/[\n\t ]+/g, ' ');
+                    previousNode.text += joinedProcessedText;
+                } else {
+                    parent.children.push(new TextNode(text, parent));
+                }}
         });
 
         saxes.write(document.getText()).close();
