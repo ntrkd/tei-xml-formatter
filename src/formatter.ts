@@ -1,5 +1,5 @@
 import { SaxesParser } from 'saxes';
-import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode } from './types/ast';
+import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode } from './types/ast';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine, FMTNode, Wrap } from './types/fmt';
 import * as vscode from 'vscode';
 
@@ -45,7 +45,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         });
 
         saxes.on("text", function(text) {
-            // text = text.replace(/^[\s\t\n]+|[\s\t\n]+$|[\n\t]+/g, '');
             text = text.replace(/[\n\t ]+/g, ' ');
 
             if (text !== "") {
@@ -54,9 +53,47 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
                 if (previousNode instanceof TextNode) {
                     let joinedProcessedText = (previousNode.text + text).replace(/[\n\t ]+/g, ' ');
+
+                    // Previous node would already have had the beginning space transformed into a SpacingNode already
+                    // So just check the ending
+                    if (joinedProcessedText.charAt(joinedProcessedText.length - 1) === " ") {
+                        // Edit to remove the space
+                        joinedProcessedText = joinedProcessedText.substring(0, joinedProcessedText.length - 1);
+
+                        // Push SpacingNode
+                        parent.children.push(new SpacingNode(parent));
+                    }
+
                     previousNode.text += joinedProcessedText;
                 } else {
-                    parent.children.push(new TextNode(text, parent));
+                    let spaceAtFirst = text.charAt(0) === " " ? true : false;
+                    let spaceAtLast = text.charAt(text.length - 1) === " " ? true : false;
+                    let textNode = new TextNode(text, parent); // Reference to edit obj later
+
+                    // If text node is just a single space
+                    if (textNode.text === " ") {
+                        if (!(previousNode instanceof SpacingNode)) {
+                            parent.children.push(new SpacingNode());
+                        }
+                        return;
+                    }
+
+                    // If space at first, check if spacing node already exists with previous node else insert one
+                    if (spaceAtFirst) {
+                        textNode.text = textNode.text.substring(1);
+                        if (!(previousNode instanceof SpacingNode)) {
+                            parent.children.push(new SpacingNode);
+                        }
+                    }
+
+                    // Push text node
+                    parent.children.push(textNode);
+
+                    // If space at last, trim text and insert SpacingNode
+                    if (spaceAtLast) {
+                        textNode.text = textNode.text.substring(0, textNode.text.length - 1);
+                        parent.children.push(new SpacingNode());
+                    }
                 }}
         });
 
