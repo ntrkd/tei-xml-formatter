@@ -1,9 +1,6 @@
 # Change Log
 
-All notable changes to the "tei-xml-fmt" extension will be documented in this file.
-
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
-
-- Initial release
+## [Development]
+In development, breaking feature is the feature.
