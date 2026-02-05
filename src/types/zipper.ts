@@ -39,8 +39,8 @@ export class Context<T> {
 }
 
 type ZipperMod<T extends object> = 
-    | { success: true;  zipper: Zipper<T> }
-    | { success: false; reason: 'LEAF_NODE' | 'EMPTY_PARENT' | 'NO_SIBLING' | 'AT_ROOT' | 'EXPECTED_PARENT_WITH_CHILDREN' };
+    | { success: true; zipper: Zipper<T> }
+    | { success: false; reason: ZipperError; message?: string };
 
 export class Zipper<T extends object> {
     focus: Focus<T>;
@@ -57,17 +57,17 @@ export class Zipper<T extends object> {
     // Method: goDown()  // Moves focus to the first child of a Section
     goDown(): ZipperMod<T> {
         if (!this.hasChildren(this.focus.data)) {
-            return { success: false, reason: "LEAF_NODE"};
+            return { success: false, reason: ZipperError.LEAF_NODE };
         }
 
         const children = this.focus.data.children;
 
         if (!children || children.length === 0) {
-            return { success: false, reason: "LEAF_NODE"};
+            return { success: false, reason:ZipperError.LEAF_NODE };
         }
 
         const rightSiblings = new LinkedList<T>();
-        if (children.length > 2) {
+        if (children.length >= 2) {
             for (let i = 1; i < children.length; i++) {
                 rightSiblings.append(children[i]);
             }
@@ -87,13 +87,14 @@ export class Zipper<T extends object> {
     goUp(): ZipperMod<T> {
         // Check both values to avoid TS compile errors
         if (this.context.parent_value instanceof Top || this.context.parent_context instanceof Top) {
-            return { success: false, reason: "AT_ROOT" };
+            return { success: false, reason: ZipperError.AT_ROOT };
         }
 
-        let parent: T = this.context.parent_value;
+        const parentContext = this.context.parent_context as Context<T>;
+        let parent: T = this.context.parent_value as T;
         
         if (!this.hasChildren(parent)) {
-            return { success: false, reason: "EXPECTED_PARENT_WITH_CHILDREN" };
+            return { success: false, reason: ZipperError.PARENT_HAS_NO_CHILDREN };
         }
 
         let childrenArr: T[] = [];
@@ -124,14 +125,13 @@ export class Zipper<T extends object> {
             this.context.parent_context.right_siblings
         );
 
-
         return { success: true, zipper: new Zipper<T>(new Focus<T>(parent), newContext) };
     }
 
     // Method: goLeft()  // Moves focus to the immediate elder sibling
     goLeft(): ZipperMod<T> {
         if (this.context.left_siblings.getSize() <= 0) {
-            return { success: false, reason: "NO_SIBLING" };
+            return { success: false, reason: ZipperError.NO_SIBLING };
         }
         
         // Prepend focus into right_sib
@@ -155,7 +155,7 @@ export class Zipper<T extends object> {
     // Method: goRight() // Moves focus to the immediate younger sibling
     goRight(): ZipperMod<T> {
         if (this.context.right_siblings.getSize() <= 0) {
-            return { success: false, reason: "NO_SIBLING" };
+            return { success: false, reason: ZipperError.NO_SIBLING };
         }
         
         this.context.left_siblings.append(this.focus.data);
@@ -222,8 +222,8 @@ export class Zipper<T extends object> {
         let newData = this.focus.data;
         
         // Type guards
-        if (!this.hasChildren(newData) || newData.children.length === 0) {
-            return { success: false, reason: 'LEAF_NODE' };
+        if (!this.hasChildren(newData)) {
+            return { success: false, reason: ZipperError.LEAF_NODE };
         }
 
         newData.children.unshift(node);
