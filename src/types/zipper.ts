@@ -38,7 +38,16 @@ export class Context<T> {
     }
 }
 
-type ZipperMod<T extends object> = 
+export enum ZipperError {
+    LEAF_NODE = 'LEAF_NODE',
+    NO_SIBLING = 'NO_SIBLING',
+    AT_ROOT = 'AT_ROOT',
+    AT_END = 'AT_END',
+    PARENT_HAS_NO_CHILDREN = 'PARENT_HAS_NO_CHILDREN',
+    INVALID_PARENT = 'INVALID_PARENT'
+}
+
+type ZipperMod<T extends object> =
     | { success: true; zipper: Zipper<T> }
     | { success: false; reason: ZipperError; message?: string };
 
@@ -174,6 +183,52 @@ export class Zipper<T extends object> {
 
         return { success: true, zipper: new Zipper<T>(new Focus(newFocus), newContext) };
     }
+
+    // goNext()
+    goNext(): ZipperMod<T> {
+        // try to go down
+        let goDown = this.goDown();
+
+        if (goDown.success) {
+            return goDown;
+        }
+
+        // try to go right
+        let goRight = this.goRight();
+
+        if (goRight.success) {
+            return goRight;
+        }
+
+        // loop go up and go right until go right works or we cant go up anymore
+        let current: Zipper<T> = this;
+        do {
+            let goUp = current.goUp();
+
+            if (goUp.success) {
+                goRight = goUp.zipper.goRight();
+
+                if (goRight.success) {
+                    return goRight;
+                } else {
+                    current = goUp.zipper;
+                }
+            } else {
+                if (goUp.reason === ZipperError.AT_ROOT || goUp.reason === ZipperError.PARENT_HAS_NO_CHILDREN) {
+                    break;
+                }
+            }
+
+        } while(true);
+
+        // TODO
+        // goNext: iterate using the zipper returned by goUp 
+        // (so you actually climb multiple levels); don't repeatedly call this.goUp().
+
+        return { success: false, reason: ZipperError.AT_END };
+    }
+
+    // goPrevious()
 
     // --- METHODS: MODIFICATION ---
     // Method: change(Tree newTree)    // Replaces the current focus
