@@ -40,6 +40,8 @@ export function isParentNode(node: BaseNode): node is ParentNode {
 
 // A DocumentNode - A Parent Node. Must be the root of the tree.
 export class DocumentNode extends BaseParentNode {
+    kind = 'Document' as const;
+
     constructor(
         children: ASTNode[] = []
     ) {
@@ -53,6 +55,7 @@ export class DocumentNode extends BaseParentNode {
 
 // Tag Node - A Parent Node. Contains a Close Tag Node as its last child unless selfClose = true
 export class TagNode extends BaseParentNode {
+    kind = 'Tag' as const;
     name: string;
     selfClosing: boolean;
     attributes: Record<string, string>;
@@ -76,6 +79,7 @@ export class TagNode extends BaseParentNode {
 
 // Close Tag Node - Only inserted on non-self closing tags. Always the last child.
 export class CloseTagNode implements BaseNode {
+    kind = 'CloseTag' as const;
     name: string;
     parent: ParentNode | null;
 
@@ -90,6 +94,7 @@ export class CloseTagNode implements BaseNode {
 
 // Text Node - Contains a single field of type string which is editable after initialization.
 export class TextNode implements BaseNode {
+    kind = 'Text' as const;
     text: string;
     parent: ParentNode | null;
 
@@ -104,6 +109,7 @@ export class TextNode implements BaseNode {
 
 // Spacing Node - A placeholder for where spaces can be inserted.
 export class SpacingNode implements BaseNode {
+    kind = 'Spacing' as const;
     parent: ParentNode | null;
 
     constructor(
