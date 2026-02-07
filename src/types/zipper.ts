@@ -47,7 +47,7 @@ export enum ZipperError {
     INVALID_PARENT = 'INVALID_PARENT'
 }
 
-type ZipperMod<T extends object> =
+export type ZipperMod<T extends object> =
     | { success: true; zipper: Zipper<T> }
     | { success: false; reason: ZipperError; message?: string };
 
@@ -218,17 +218,46 @@ export class Zipper<T extends object> {
                     break;
                 }
             }
-
         } while(true);
-
-        // TODO
-        // goNext: iterate using the zipper returned by goUp 
-        // (so you actually climb multiple levels); don't repeatedly call this.goUp().
 
         return { success: false, reason: ZipperError.AT_END };
     }
 
     // goPrevious()
+    goPrevious(): ZipperMod<T> {
+        // go left
+        // if successful find if it has children and move to the final child
+        let goLeft = this.goLeft();
+        if (goLeft.success) {
+            // find child
+            let goDown = goLeft.zipper.goDown();
+            if (goDown.success) {
+                let current: ZipperMod<T> = goDown;
+
+                // loop goRight until we can't anymore and return goRight
+                while (true) {
+                    let currentShifted: ZipperMod<T> = current.zipper.goRight();
+                    if (currentShifted.success) {
+                        current = currentShifted;
+                    } else {
+                        break;
+                    }
+                }
+
+                return current;
+            }
+
+            return goLeft;
+        }
+
+        // go up
+        let goUp: ZipperMod<T> = this.goUp();
+        if (goUp.success) {
+            return goUp;
+        } else {
+            return { success: false, reason: ZipperError.AT_ROOT };
+        }
+    }
 
     // --- METHODS: MODIFICATION ---
     // Method: change(Tree newTree)    // Replaces the current focus
