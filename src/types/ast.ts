@@ -108,13 +108,22 @@ export class TextNode implements BaseNode {
 }
 
 // Spacing Node - A placeholder for where spaces can be inserted.
+// add a property propogatedLeft and propogatedRight to keep track
+// of which nodes have been propogated left and right
 export class SpacingNode implements BaseNode {
     kind = 'Spacing' as const;
     parent: ParentNode | null;
 
+    propogateRight: boolean;
+    propogateLeft: boolean;
+
     constructor(
-        parent: ParentNode | null = null
+        parent: ParentNode | null = null,
+        propogateRight: boolean,
+        propogateLeft: boolean
     ) {
         this.parent = parent;
+        this.propogateRight = propogateRight;
+        this.propogateLeft = propogateLeft;
     }
 }
