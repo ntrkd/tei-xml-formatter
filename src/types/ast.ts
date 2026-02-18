@@ -118,7 +118,7 @@ export class SpacingNode implements BaseNode {
     propogateLeft: boolean;
 
     constructor(
-        parent: ParentNode | null = null,
+        parent: ParentNode | null,
         propogateRight: boolean,
         propogateLeft: boolean
     ) {

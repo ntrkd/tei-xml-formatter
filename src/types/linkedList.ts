@@ -1,4 +1,4 @@
-class ChainNode<T> {
+export class ChainNode<T> {
     previous: ChainNode<T> | null;
     next: ChainNode<T> | null;
     data: T;
