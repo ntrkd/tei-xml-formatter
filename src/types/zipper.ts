@@ -13,12 +13,10 @@ export class Focus<T> {
     }
 }
 
-// Empty class to represent the root of a tree
+/** Empty class to represent the root of a tree */
 export class Top {}
 
-/**
- * Stores all the context needed to rebuild the tree above the current focus.
- */
+/** Stores all the context needed to rebuild the tree above the current focus. */
 export class Context<T> {
     left_siblings: LinkedList<T>;
     parent_context: Top | Context<T>;
@@ -256,6 +254,24 @@ export class Zipper<T extends object> {
             return goUp;
         } else {
             return { success: false, reason: ZipperError.AT_ROOT };
+        }
+    }
+
+    // Move to the root using goPrevious()
+    goTop(): ZipperMod<T> {
+        let current: Zipper<T> = this;
+        while (true) {
+            const prev = current.goPrevious();
+            if (prev.success) {
+                current = prev.zipper;
+                continue;
+            } else {
+                if (prev.reason === ZipperError.AT_ROOT) {
+                    return { success: true, zipper: current };
+                } else {
+                    return { success: false, reason: prev.reason, message: prev.message };
+                }
+            }
         }
     }
 
