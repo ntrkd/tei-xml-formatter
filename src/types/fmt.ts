@@ -1,13 +1,13 @@
 export type FMTNode = Group | Text | Line | LineIndent | LineDeindent | SpaceOrLine;
 export type Wrap = 'Wrap' | 'Detect' | 'NoWrap';
 
-interface BaseNode {
+interface BaseFMTNode {
   kind: string;
   
   width() : number
 }
 
-export class Group implements BaseNode {
+export class Group implements BaseFMTNode {
   public kind = "Group" as const;
   public nodes: FMTNode[];
 
@@ -26,7 +26,7 @@ export class Group implements BaseNode {
   }
 }
 
-export class Text implements BaseNode {
+export class Text implements BaseFMTNode {
   public kind = "Text" as const;
   public readonly text: string;
 
@@ -39,7 +39,7 @@ export class Text implements BaseNode {
   }
 }
 
-export class SpaceOrLine implements BaseNode {
+export class SpaceOrLine implements BaseFMTNode {
   public kind = "SpaceOrLine" as const;
 
   width() : number {
@@ -50,7 +50,7 @@ export class SpaceOrLine implements BaseNode {
 /**
  * Renders to a line if the parent group needs wrapping, else renders to nothing
  */
-export class Line implements BaseNode {
+export class Line implements BaseFMTNode {
   public kind = "Line" as const;
 
   width() : number {
@@ -58,7 +58,7 @@ export class Line implements BaseNode {
   }
 }
 
-export class LineIndent implements BaseNode {
+export class LineIndent implements BaseFMTNode {
   public kind = "LineIndent" as const;
 
   width() : number {
@@ -66,7 +66,7 @@ export class LineIndent implements BaseNode {
   }
 }
 
-export class LineDeindent implements BaseNode {
+export class LineDeindent implements BaseFMTNode {
   public kind = "LineDeindent" as const;
 
   width() : number {
