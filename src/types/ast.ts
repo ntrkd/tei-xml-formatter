@@ -8,12 +8,12 @@ export type ASTNode = DocumentNode
     | TextNode
     | SpacingNode;
 
-export interface BaseNode {
+export interface BaseASTNode {
     parent: ParentNode | null;
 }
 
 // ParentNode interface
-export interface ParentNode extends BaseNode {
+export interface ParentNode extends BaseASTNode {
     parent: ParentNode | null;
     children: ASTNode[];
 
@@ -34,7 +34,7 @@ export abstract class BaseParentNode implements ParentNode {
     }
 }
 
-export function isParentNode(node: BaseNode): node is ParentNode {
+export function isParentNode(node: BaseASTNode): node is ParentNode {
     return Array.isArray((node as any).children);
 }
 
@@ -78,7 +78,7 @@ export class TagNode extends BaseParentNode {
 }
 
 // Close Tag Node - Only inserted on non-self closing tags. Always the last child.
-export class CloseTagNode implements BaseNode {
+export class CloseTagNode implements BaseASTNode {
     kind = 'CloseTag' as const;
     name: string;
     parent: ParentNode | null;
@@ -93,7 +93,7 @@ export class CloseTagNode implements BaseNode {
 }
 
 // Text Node - Contains a single field of type string which is editable after initialization.
-export class TextNode implements BaseNode {
+export class TextNode implements BaseASTNode {
     kind = 'Text' as const;
     text: string;
     parent: ParentNode | null;
@@ -110,7 +110,7 @@ export class TextNode implements BaseNode {
 // Spacing Node - A placeholder for where spaces can be inserted.
 // add a property propogatedLeft and propogatedRight to keep track
 // of which nodes have been propogated left and right
-export class SpacingNode implements BaseNode {
+export class SpacingNode implements BaseASTNode {
     kind = 'Spacing' as const;
     parent: ParentNode | null;
 
