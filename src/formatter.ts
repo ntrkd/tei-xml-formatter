@@ -1,5 +1,5 @@
 import { SaxesParser } from 'saxes';
-import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './types/ast';
+import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode, BaseParentNode } from './types/ast';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine, FMTNode, Wrap } from './types/fmt';
 import * as vscode from 'vscode';
 import { Focus, Top, Zipper, Context, ZipperError, ZipperMod } from './types/zipper';
@@ -109,6 +109,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         }
 
         const astFile = vscode.Uri.joinPath(folder.uri, "ast.json");
+        // this.printDocumentNodeInfo(xmlDoc, astFile);
         const dd = this.serializeNode(xmlDoc);
         vscode.workspace.fs.writeFile(astFile, Buffer.from(dd));
 
@@ -123,15 +124,175 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         );
 
         zipper = this.propogateSpaces(zipper);
+        let zTmp = zipper.goTop();
+        if (zTmp.success) {zipper = zTmp.zipper;}
 
         const spaceZip = vscode.Uri.joinPath(folder.uri, "zip.json");
+        // this.printZipperInfo(zipper, spaceZip);
         const serializedZip = this.serializeNode(zipper.focus.data);
         vscode.workspace.fs.writeFile(spaceZip, Buffer.from(serializedZip));
+
+        const fmtFile = vscode.Uri.joinPath(folder.uri, "fmt.json");
+        // this.printZipperInfo(zipper, spaceZip);
+        const serializedFmt = this.serializeFmt(this.buildFormattingTree(zipper.focus.data));
+        vscode.workspace.fs.writeFile(fmtFile, Buffer.from(serializedFmt));
+
+        let output = this.renderFormattingTree(this.buildFormattingTree(zipper.focus.data));
+        const formattedFile = vscode.Uri.joinPath(folder.uri, "fmt.xml");
+        vscode.workspace.fs.writeFile(formattedFile, Buffer.from(output));
 
         return;
     }
 
+    renderFormattingTree(tree: Group): string {
+        const MAX_WIDTH = 80;
+        const INDENT_UNIT = '\t';
+
+        let output = '';
+        let indentLevel = 0;
+        let lineLength = 0;
+
+        const newline = () => {
+            output += '\n' + INDENT_UNIT.repeat(indentLevel);
+            lineLength = indentLevel;
+        };
+
+        const appendText = (text: string) => {
+            output += text;
+            lineLength += text.length;
+        };
+
+        const renderNode = (node: FMTNode, parentWrap: boolean): void => {
+            if (node instanceof Text) {
+                appendText(node.text);
+                return;
+            }
+
+            if (node instanceof Group) {
+                const fitRemaining = MAX_WIDTH - lineLength;
+                const shouldWrap = parentWrap || node.width() > fitRemaining;
+                for (const child of node.nodes) {
+                    renderNode(child, shouldWrap);
+                }
+                return;
+            }
+
+            if (node instanceof SpaceOrLine) {
+                if (parentWrap) {
+                    newline();
+                } else {
+                    appendText(' ');
+                }
+                return;
+            }
+
+            if (node instanceof Line) {
+                if (parentWrap) {
+                    newline();
+                }
+                return;
+            }
+
+            if (node instanceof LineIndent) {
+                if (parentWrap) {
+                    newline();
+                    indentLevel += 1;
+                }
+                return;
+            }
+
+            if (node instanceof LineDeindent) {
+                if (parentWrap) {
+                    indentLevel = Math.max(0, indentLevel - 1);
+                    newline();
+                }
+                return;
+            }
+        };
+
+        renderNode(tree, false);
+        return output;
+    }
+
+    buildFormattingTree(tree: ASTNode): Group {
+
+        // first make a zipper
+        let zipper = new Zipper<ASTNode>(
+            new Focus<ASTNode>(tree), 
+            new Context<ASTNode>(
+                new LinkedList<ASTNode>(), 
+                new Top(), 
+                new Top(), 
+                new LinkedList<ASTNode>()
+            )
+        );
+
+        let fmtTree: Group = new Group([]);
+        let fmtStack: Group[] = [ fmtTree ];
+
+        // setup a loop to go until the end (!success)
+        while (true) {
+            // do logic
+            let stackTop: Group = fmtStack[fmtStack.length - 1];
+            // decide what type the current focus is
+            let focus: ASTNode = zipper.focus.data;
+
+            if (focus instanceof DocumentNode) {
+                // this node renders to nothing
+            } else if (focus instanceof TagNode) {
+                // needs a new group attached, stack increased, and tag node textualized and added to the new group
+                let attrStr = Object.entries(focus.attributes).map(([k, v]) => ` ${k}="${v}"`).join('');
+                let tagText = `<${focus.name}${attrStr}${focus.selfClosing ? ' /' : ''}>`;
+                let newGroup = new Group([new Text(tagText)]);
+                stackTop.nodes.push(newGroup);
+                if (!focus.selfClosing) {
+                    fmtStack.push(newGroup);
+                }
+            } else if (focus instanceof CloseTagNode) {
+                // textualized and added to most recent group, then pop the stack
+                let closeText = `</${focus.name}>`;
+                stackTop.nodes.push(new Text(closeText));
+                fmtStack.pop();
+            } else if (focus instanceof TextNode) {
+                // just add as a text node
+                stackTop.nodes.push(new Text(focus.text));
+            } else if (focus instanceof SpacingNode) {
+                // handled per 3b. in the algorithm spec
+                let prevNode = zipper.peekPrevious();
+                let nextNode = zipper.peekNext();
+
+                // prev tag == open tag && next tag != close tag
+                if (((prevNode !== null && ((prevNode instanceof TagNode && !prevNode.selfClosing) || prevNode instanceof DocumentNode)) || prevNode === null)
+                    && (nextNode === null || !(nextNode instanceof CloseTagNode))) {
+                    stackTop.nodes.push(new LineIndent());
+                }
+                // prev tag != open tag && next tag == close tag
+                else if (prevNode === null || !(prevNode instanceof TagNode)
+                    && ((nextNode !== null && nextNode instanceof CloseTagNode)) || nextNode === null) {
+                    stackTop.nodes.push(new LineDeindent());
+                } else {
+                    stackTop.nodes.push(new SpaceOrLine());
+                }
+            }
+
+
+            let next = zipper.goNext();
+
+            // check for break;
+            if (!next.success) {
+                break; // reached the end
+            }
+
+            // increment
+            zipper = next.zipper;
+        }
+
+        return fmtTree;
+    }
+
     propogateSpaces(zipper: Zipper<ASTNode>): Zipper<ASTNode> {
+        // TODO: need to go to top before propogating. Consider changing the input to just a tree and init the zipper ourselves
+
         // Carrying means inserting another Spacing node after the next node if the node in front of it can be crossed.
         // If we are carrying left, it can cross only open tags. If we are carrying right, it can cross only close tags.
         // If the Spacing node will reside next to another Spacing node, do not insert it.
