@@ -257,6 +257,62 @@ export class Zipper<T extends object> {
         }
     }
 
+    // peekNext() - Returns the next node without modifying the zipper
+    peekNext(): T | null {
+        // try to go down
+        if (this.hasChildren(this.focus.data) && this.focus.data.children && this.focus.data.children.length > 0) {
+            return this.focus.data.children[0];
+        }
+
+        // try to go right
+        if (this.context.right_siblings.getSize() > 0) {
+            return this.context.right_siblings.getHead()!.data;
+        }
+
+        // loop go up and go right until go right works or we cant go up anymore
+        let currentContext = this.context;
+        while (true) {
+            if (currentContext.parent_value instanceof Top || currentContext.parent_context instanceof Top) {
+                return null;
+            }
+
+            let parentContext = currentContext.parent_context as Context<T>;
+
+            // try go right on parent level
+            if (parentContext.right_siblings.getSize() > 0) {
+                return parentContext.right_siblings.getHead()!.data;
+            }
+
+            currentContext = parentContext;
+        }
+    }
+
+    // peekPrevious() - Returns the previous node without modifying the zipper
+    peekPrevious(): T | null {
+        // try to go left
+        if (this.context.left_siblings.getSize() > 0) {
+            let leftNode = this.context.left_siblings.getTail()!.data;
+
+            // if it has children, go to the deepest rightmost child
+            if (this.hasChildren(leftNode) && leftNode.children && leftNode.children.length > 0) {
+                let current = leftNode.children[leftNode.children.length - 1];
+                while (this.hasChildren(current) && current.children && current.children.length > 0) {
+                    current = current.children[current.children.length - 1];
+                }
+                return current;
+            } else {
+                return leftNode;
+            }
+        }
+
+        // try to go up
+        if (!(this.context.parent_value instanceof Top) && !(this.context.parent_context instanceof Top)) {
+            return this.context.parent_value as T;
+        }
+
+        return null;
+    }
+
     // Move to the root using goPrevious()
     goTop(): ZipperMod<T> {
         let current: Zipper<T> = this;
