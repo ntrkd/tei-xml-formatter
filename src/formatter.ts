@@ -101,7 +101,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
         saxes.write(document.getText()).close();
 
-
         const folder = vscode.workspace.workspaceFolders?.[0];
         if (!folder) {
             vscode.window.showErrorMessage("No workspace open");
@@ -110,8 +109,8 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
         const astFile = vscode.Uri.joinPath(folder.uri, "ast.json");
         // this.printDocumentNodeInfo(xmlDoc, astFile);
-        const dd = this.serializeNode(xmlDoc);
-        vscode.workspace.fs.writeFile(astFile, Buffer.from(dd));
+        const xmlNodesPrint = this.serializeNode(xmlDoc);
+        vscode.workspace.fs.writeFile(astFile, Buffer.from(xmlNodesPrint));
 
         let propogatedTree = this.propogateSpaces(xmlDoc);
 
@@ -256,7 +255,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
     }
 
     propogateSpaces(tree: ASTNode): ASTNode {
-        // TODO: need to go to top before propogating. Consider changing the input to just a tree and init the zipper ourselves
         let zipper = new Zipper<ASTNode>(
             new Focus<ASTNode>(tree), 
             new Context<ASTNode>(
@@ -299,9 +297,9 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                         // TODO: messy logic. Having parent values be possibly null is not the best solution
                         if (insertRightNext) {
                             // Check that SpacingNodes do not already exist
-                            let immediateRightSib: ChainNode<ASTNode> | null = current.context.right_siblings.getHead();
+                            let nextElement: ASTNode | null = current.peekNext();
                             // TODO: This logic needs looking over again
-                            if ((immediateRightSib === null || !(immediateRightSib.data instanceof SpacingNode))) {
+                            if ((nextElement === null || !(nextElement instanceof SpacingNode))) {
                             // if ( !(rightmostSib !== null && rightmostSib.data instanceof SpacingNode) ) { 
                                 let parentVal: ParentNode | null = null;
                                 if ( !(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value) ) { parentVal = current.context.parent_value; }
@@ -340,9 +338,9 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                         // TODO: messy logic. Having parent values be possibly null is not the best solution
                         if (insertLeftNext) {
                             // Check that SpacingNodes do not already exist
-                            let immediateLeftSib: ChainNode<ASTNode> | null = current.context.left_siblings.getTail();
+                            let prevNode: ASTNode | null = current.peekPrevious();
                             // TODO: This logic needs looking over again
-                            if ((immediateLeftSib === null || !(immediateLeftSib.data instanceof SpacingNode))) {
+                            if ((prevNode === null || !(prevNode instanceof SpacingNode))) {
                                 let parentVal: ParentNode | null = null;
                                 if ( !(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value) ) { parentVal = current.context.parent_value; }
 
