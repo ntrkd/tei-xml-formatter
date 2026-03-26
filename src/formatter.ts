@@ -113,26 +113,14 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         const dd = this.serializeNode(xmlDoc);
         vscode.workspace.fs.writeFile(astFile, Buffer.from(dd));
 
-        let zipper = new Zipper<ASTNode>(
-            new Focus<ASTNode>(xmlDoc), 
-            new Context<ASTNode>(
-                new LinkedList<ASTNode>(), 
-                new Top(), 
-                new Top(), 
-                new LinkedList<ASTNode>()
-            )
-        );
-
-        zipper = this.propogateSpaces(zipper);
-        let zTmp = zipper.goTop();
-        if (zTmp.success) {zipper = zTmp.zipper;}
+        let propogatedTree = this.propogateSpaces(xmlDoc);
 
         const spaceZip = vscode.Uri.joinPath(folder.uri, "zip.json");
         // this.printZipperInfo(zipper, spaceZip);
-        const serializedZip = this.serializeNode(zipper.focus.data);
+        const serializedZip = this.serializeNode(propogatedTree);
         vscode.workspace.fs.writeFile(spaceZip, Buffer.from(serializedZip));
 
-        const fmtTree = this.buildFormattingTree(zipper.focus.data);
+        const fmtTree = this.buildFormattingTree(propogatedTree);
         const fmtFile = vscode.Uri.joinPath(folder.uri, "fmt.json");
         // this.printZipperInfo(zipper, spaceZip);
         const serializedFmt = this.serializeFmt(fmtTree);
@@ -267,8 +255,17 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         return fmtTree;
     }
 
-    propogateSpaces(zipper: Zipper<ASTNode>): Zipper<ASTNode> {
+    propogateSpaces(tree: ASTNode): ASTNode {
         // TODO: need to go to top before propogating. Consider changing the input to just a tree and init the zipper ourselves
+        let zipper = new Zipper<ASTNode>(
+            new Focus<ASTNode>(tree), 
+            new Context<ASTNode>(
+                new LinkedList<ASTNode>(), 
+                new Top(), 
+                new Top(), 
+                new LinkedList<ASTNode>()
+            )
+        );
 
         // Carrying means inserting another Spacing node after the next node if the node in front of it can be crossed.
         // If we are carrying left, it can cross only open tags. If we are carrying right, it can cross only close tags.
@@ -386,10 +383,10 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         
         let goTop = current.goTop();
         if (goTop.success) {
-            return goTop.zipper;
+            return goTop.zipper.focus.data;
         } else {
             // TODO: This needs error handling, should never happen
-            return current;
+            return current.focus.data;
         }
     }
 
