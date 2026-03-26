@@ -132,90 +132,67 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         const serializedZip = this.serializeNode(zipper.focus.data);
         vscode.workspace.fs.writeFile(spaceZip, Buffer.from(serializedZip));
 
+        const fmtTree = this.buildFormattingTree(zipper.focus.data);
         const fmtFile = vscode.Uri.joinPath(folder.uri, "fmt.json");
         // this.printZipperInfo(zipper, spaceZip);
-        const serializedFmt = this.serializeFmt(this.buildFormattingTree(zipper.focus.data));
+        const serializedFmt = this.serializeFmt(fmtTree);
         vscode.workspace.fs.writeFile(fmtFile, Buffer.from(serializedFmt));
 
-        let output = this.renderFormattingTree(this.buildFormattingTree(zipper.focus.data));
+        let output = this.renderNode(fmtTree, false, 0);
         const formattedFile = vscode.Uri.joinPath(folder.uri, "fmt.xml");
-        vscode.workspace.fs.writeFile(formattedFile, Buffer.from(output));
+        vscode.workspace.fs.writeFile(formattedFile, Buffer.from(output[0]));
 
         return;
     }
 
-    renderFormattingTree(tree: Group): string {
-        const MAX_WIDTH = 80;
+    // rendered string and indent number
+    renderNode(node: FMTNode, parentWrap: boolean, indentLevel: number): [string, number] {
+        const MAX_WDITH = 80;
         const INDENT_UNIT = '\t';
+        const NEWLINE = '\n';
 
         let output = '';
-        let indentLevel = 0;
-        let lineLength = 0;
+        let nodeWrap: boolean = node.width() > MAX_WDITH;
 
-        const newline = () => {
-            output += '\n' + INDENT_UNIT.repeat(indentLevel);
-            lineLength = indentLevel;
-        };
-
-        const appendText = (text: string) => {
-            output += text;
-            lineLength += text.length;
-        };
-
-        const renderNode = (node: FMTNode, parentWrap: boolean): void => {
-            if (node instanceof Text) {
-                appendText(node.text);
-                return;
+        // if the parent is wrapping then every new group gets its own newline
+        // if the parent decides to wrap, the child can decide to not wrap
+        // if the parent decides to not wrap, every child (recursive) MUST not wrap
+        if (node instanceof Group) {
+            // call render node on all children and add em up
+            for (const child of node.nodes) {
+                let renderChild = this.renderNode(child, nodeWrap, indentLevel);
+                output += renderChild[0];
+                indentLevel = renderChild[1];
+            } 
+        } else if (node instanceof Text) {
+           output += node.text;
+        } else if (node instanceof SpaceOrLine) {
+            if (parentWrap) {
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            } else {
+                output += ' ';
             }
+        } else if (node instanceof Line) {
+            // if (parentWrap) {
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            // }
+        } else if (node instanceof LineIndent) {
+            // if (parentWrap) {
+                indentLevel++;
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            // }
+        } else if (node instanceof LineDeindent) {
+            // if (parentWrap) {
+                indentLevel = Math.max(0, indentLevel - 1);
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            // }
+        }
 
-            if (node instanceof Group) {
-                const fitRemaining = MAX_WIDTH - lineLength;
-                const shouldWrap = parentWrap || node.width() > fitRemaining;
-                for (const child of node.nodes) {
-                    renderNode(child, shouldWrap);
-                }
-                return;
-            }
 
-            if (node instanceof SpaceOrLine) {
-                if (parentWrap) {
-                    newline();
-                } else {
-                    appendText(' ');
-                }
-                return;
-            }
-
-            if (node instanceof Line) {
-                if (parentWrap) {
-                    newline();
-                }
-                return;
-            }
-
-            if (node instanceof LineIndent) {
-                if (parentWrap) {
-                    newline();
-                    indentLevel += 1;
-                }
-                return;
-            }
-
-            if (node instanceof LineDeindent) {
-                if (parentWrap) {
-                    indentLevel = Math.max(0, indentLevel - 1);
-                    newline();
-                }
-                return;
-            }
-        };
-
-        renderNode(tree, false);
-        return output;
+        return [output, indentLevel];
     }
 
     buildFormattingTree(tree: ASTNode): Group {
-
         // first make a zipper
         let zipper = new Zipper<ASTNode>(
             new Focus<ASTNode>(tree), 
