@@ -267,7 +267,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                     stackTop.nodes.push(new LineIndent());
                 }
                 // prev tag != open tag && next tag == close tag
-                else if (prevNode === null || !(prevNode instanceof TagNode)
+                else if ((prevNode === null || (prevNode instanceof TagNode && prevNode.selfClosing) || !(prevNode instanceof TagNode))
                     && ((nextNode !== null && nextNode instanceof CloseTagNode)) || nextNode === null) {
                     stackTop.nodes.push(new LineDeindent());
                 } else {
