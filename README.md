@@ -61,6 +61,11 @@ TEI Council - [TEI Specification](https://tei-c.org/release/doc/tei-p5-doc/en/ht
 
     a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
 
+## TODO
+- [ ] Improve implementation of 5b. by looking at the first next/previous node that is not a spacing node
+- [ ] Make zipper immutable?
+- [ ] Change propogateSpaces method to accept a ASTNode root instead of a Zipper 
+
 ## Most Recent Prototype Formatting Demonstration
 The current code was quickly written to see how parts of the algorithm above would function and to spot weaknesses. The output is shown below.
 
