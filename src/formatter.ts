@@ -239,8 +239,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 let nextNode = zipper.peekNext();
                 let space: FMTNode;
 
+                if (focus.onlySpace) {
+                    space = new SpaceOrLine();
+                    stackTop.nodes.push(space);
                 // prev tag == open tag && next tag != close tag
-                if (((prevNode !== null && (prevNode instanceof TagNode && !prevNode.selfClosing)) || prevNode === null)
+                } else if (((prevNode !== null && (prevNode instanceof TagNode && !prevNode.selfClosing)) || prevNode === null)
                     && (nextNode === null || !(nextNode instanceof CloseTagNode))) {
                     space = new LineIndent();
                     stackTop.nodes.push(space);
@@ -281,14 +284,24 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             // find first and last SpacingNode among this TagNodes children
             let firstSpacing: SpacingNode | null = null;
             let lastSpacing: SpacingNode | null = null;
+            let lastSpace: SpacingNode | null = null;
+            let numSpaces: number = 0;
             
             for (const child of node.children) {
                 if (child instanceof SpacingNode) {
+                    lastSpace = child;
+                    numSpaces++;
+
                     if (firstSpacing === null) {
                         firstSpacing = child;
                     }
                     lastSpacing = child;
                 }
+            }
+
+            // mark the space as lonely
+            if (numSpaces === 1 && lastSpace !== null) {
+                lastSpace.onlySpace = true;
             }
             
             // mark the first and last spacing nodes

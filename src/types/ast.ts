@@ -117,6 +117,7 @@ export class SpacingNode implements BaseASTNode {
     id: number;
     firstInTag: boolean;
     lastInTag: boolean;
+    onlySpace: boolean;
 
     propogateRight: boolean;
     propogateLeft: boolean;
@@ -132,5 +133,6 @@ export class SpacingNode implements BaseASTNode {
         this.id = SpacingNode.uniqueIDCount++;
         this.firstInTag = false;
         this.lastInTag = false;
+        this.onlySpace = false;
     }
 }
