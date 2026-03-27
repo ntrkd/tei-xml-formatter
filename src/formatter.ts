@@ -287,6 +287,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
 
             // each iteration:
             // check if we are at SpacingNode
+            // TODO: INVESTIGATE WHY <closer><salute> doesnt get a spacing node in between
             let currNode = current.focus.data;
             if (currNode instanceof SpacingNode) {
                 // if Spacing Node has propogateLeft as false
@@ -378,9 +379,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         }
         
         // once all the looping is done, all spaces should be propogated
-        // return current: Zipper<ASTNode> after going all the way to the top
 
-        
         let goTop = current.goTop();
         if (goTop.success) {
             return goTop.zipper.focus.data;
@@ -405,14 +404,26 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 // Remove circular reference
                 if (key === 'parent') { return undefined; };
 
-                // Inject instance name for AST nodes
+                // Inject instance name for AST nodes and ensure children is last
                 if (value && typeof value === 'object') {
                     const ctor = value.constructor;
                     if (ctor && ctor !== Object) {
-                        return {
-                            _type: ctor.name,
-                            ...value
-                        };
+                        const result: any = { _type: ctor.name };
+
+                        // copy over properties except children first
+                        for (const [propName, propValue] of Object.entries(value)) {
+                            if (propName === 'parent' || propName === 'children') {
+                                continue;
+                            }
+                            result[propName] = propValue;
+                        }
+
+                        // append children at end if present
+                        if ('children' in value) {
+                            result.children = (value as any).children;
+                        }
+
+                        return result;
                     }
                 }
 
