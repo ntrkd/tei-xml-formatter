@@ -18,6 +18,8 @@ type Carry = {
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TextEdit[]> {
+        // lets restart from 1 so each new format doesnt result in crazy long id counts
+        SpacingNode.uniqueIDCount = 1;
         const saxes = new SaxesParser();        
         const he = require('he');
 
