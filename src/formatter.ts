@@ -228,7 +228,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 let nextNode = zipper.peekNext();
 
                 // prev tag == open tag && next tag != close tag
-                if (((prevNode !== null && ((prevNode instanceof TagNode && !prevNode.selfClosing) || prevNode instanceof DocumentNode)) || prevNode === null)
+                if (((prevNode !== null && (prevNode instanceof TagNode && !prevNode.selfClosing)) || prevNode === null)
                     && (nextNode === null || !(nextNode instanceof CloseTagNode))) {
                     stackTop.nodes.push(new LineIndent());
                 }
