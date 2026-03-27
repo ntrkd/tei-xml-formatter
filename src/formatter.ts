@@ -115,6 +115,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         vscode.workspace.fs.writeFile(astFile, Buffer.from(xmlNodesPrint));
 
         let propogatedTree = this.propogateSpaces(xmlDoc);
+        this.markFirstLastSpacingInTags(propogatedTree);
 
         const spaceZip = vscode.Uri.joinPath(folder.uri, "zip.json");
         // this.printZipperInfo(zipper, spaceZip);
@@ -157,29 +158,33 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
            output += node.text;
         } else if (node instanceof SpaceOrLine) {
             if (parentWrap) {
+                if (node.significance === "First") { indentLevel++; }
+                else if (node.significance === "Last") { indentLevel--; }
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += ' ';
             }
         } else if (node instanceof Line) {
-            if (!parentWrap) {
-                output += " ";
-            } else {
+            if (parentWrap) {
+                if (node.significance === "First") { indentLevel++; }
+                else if (node.significance === "Last") { indentLevel--; }
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            } else {
+                output += " ";
             }
         } else if (node instanceof LineIndent) {
-            if (!parentWrap) {
-                output += " ";
-            } else {
+            if (parentWrap) {
                 indentLevel++;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            } else {
+                output += " ";
             }
         } else if (node instanceof LineDeindent) {
-            if (!parentWrap) {
-                output += " ";
-            } else {
+            if (parentWrap) {
                 indentLevel = Math.max(0, indentLevel - 1);
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            } else {
+                output += " ";
             }
         }
 
@@ -232,18 +237,27 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 // handled per 3b. in the algorithm spec
                 let prevNode = zipper.peekPrevious();
                 let nextNode = zipper.peekNext();
+                let space: FMTNode;
 
                 // prev tag == open tag && next tag != close tag
                 if (((prevNode !== null && (prevNode instanceof TagNode && !prevNode.selfClosing)) || prevNode === null)
                     && (nextNode === null || !(nextNode instanceof CloseTagNode))) {
-                    stackTop.nodes.push(new LineIndent());
-                }
+                    space = new LineIndent();
+                    stackTop.nodes.push(space);
                 // prev tag != open tag && next tag == close tag
-                else if ((prevNode === null || (prevNode instanceof TagNode && prevNode.selfClosing) || !(prevNode instanceof TagNode))
+                } else if ((prevNode === null || (prevNode instanceof TagNode && prevNode.selfClosing) || !(prevNode instanceof TagNode))
                     && ((nextNode !== null && nextNode instanceof CloseTagNode)) || nextNode === null) {
-                    stackTop.nodes.push(new LineDeindent());
+                    space = new LineDeindent();
+                    stackTop.nodes.push(space);
                 } else {
-                    stackTop.nodes.push(new SpaceOrLine());
+                    space = new SpaceOrLine();
+                    stackTop.nodes.push(space);
+                }
+
+                if (focus.firstInTag && !focus.lastInTag) {
+                    space.significance = 'First';
+                } else if (!focus.firstInTag && focus.lastInTag) {
+                    space.significance = 'Last';
                 }
             }
 
@@ -260,6 +274,38 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         }
 
         return fmtTree;
+    }
+
+    private markFirstLastSpacingInTags(node: ASTNode): void {
+        if (node instanceof TagNode) {
+            // find first and last SpacingNode among this TagNodes children
+            let firstSpacing: SpacingNode | null = null;
+            let lastSpacing: SpacingNode | null = null;
+            
+            for (const child of node.children) {
+                if (child instanceof SpacingNode) {
+                    if (firstSpacing === null) {
+                        firstSpacing = child;
+                    }
+                    lastSpacing = child;
+                }
+            }
+            
+            // mark the first and last spacing nodes
+            if (firstSpacing !== null) {
+                firstSpacing.firstInTag = true;
+            }
+            if (lastSpacing !== null) {
+                lastSpacing.lastInTag = true;
+            }
+        }
+        
+        // process children
+        if (isParentNode(node)) {
+            for (const child of node.children) {
+                this.markFirstLastSpacingInTags(child);
+            }
+        }
     }
 
     propogateSpaces(tree: ASTNode): ASTNode {

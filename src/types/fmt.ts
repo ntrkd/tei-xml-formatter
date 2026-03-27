@@ -1,5 +1,6 @@
 export type FMTNode = Group | Text | Line | LineIndent | LineDeindent | SpaceOrLine;
 export type Wrap = 'Wrap' | 'Detect' | 'NoWrap';
+type FirstLast = "First" | "Last" | "None";
 
 interface BaseFMTNode {
   kind: string;
@@ -41,6 +42,7 @@ export class Text implements BaseFMTNode {
 
 export class SpaceOrLine implements BaseFMTNode {
   public kind = "SpaceOrLine" as const;
+  public significance: FirstLast = "None";
 
   width() : number {
     return 1;
@@ -52,6 +54,7 @@ export class SpaceOrLine implements BaseFMTNode {
  */
 export class Line implements BaseFMTNode {
   public kind = "Line" as const;
+  public significance: FirstLast = "None";
 
   width() : number {
     return 1;
@@ -60,6 +63,7 @@ export class Line implements BaseFMTNode {
 
 export class LineIndent implements BaseFMTNode {
   public kind = "LineIndent" as const;
+  public significance: FirstLast = "None";
 
   width() : number {
     return 1;
@@ -68,6 +72,7 @@ export class LineIndent implements BaseFMTNode {
 
 export class LineDeindent implements BaseFMTNode {
   public kind = "LineDeindent" as const;
+  public significance: FirstLast = "None";
 
   width() : number {
     return 1;
