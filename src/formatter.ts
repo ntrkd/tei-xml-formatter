@@ -162,19 +162,25 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 output += ' ';
             }
         } else if (node instanceof Line) {
-            // if (parentWrap) {
+            if (!parentWrap) {
+                output += " ";
+            } else {
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            // }
+            }
         } else if (node instanceof LineIndent) {
-            // if (parentWrap) {
+            if (!parentWrap) {
+                output += " ";
+            } else {
                 indentLevel++;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            // }
+            }
         } else if (node instanceof LineDeindent) {
-            // if (parentWrap) {
+            if (!parentWrap) {
+                output += " ";
+            } else {
                 indentLevel = Math.max(0, indentLevel - 1);
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            // }
+            }
         }
 
 
