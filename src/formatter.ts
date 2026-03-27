@@ -285,94 +285,74 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 // TODO: This part should never trigger, lets post an error
             }
 
-            // each iteration:
             // check if we are at SpacingNode
-            // TODO: INVESTIGATE WHY <closer><salute> doesnt get a spacing node in between
             let currNode = current.focus.data;
             if (currNode instanceof SpacingNode) {
                 // if Spacing Node has propogateLeft as false
                 if (!currNode.propogateLeft) {
-                    // loop needs to run n + 1 times, and the last one it is just to insert right
-                    // for every iteration we step back one, if insertRightNext true: do it and set false. Check if focus is crossable. If it is then set insertRightNext true.
-                    let insertRightNext: boolean = false;
-                    let backwardLoopVar: boolean = true;
-                    while (backwardLoopVar) {
-                        // TODO: messy logic. Having parent values be possibly null is not the best solution
-                        if (insertRightNext) {
-                            // Check that SpacingNodes do not already exist
-                            let nextElement: ASTNode | null = current.peekNext();
-                            // TODO: This logic needs looking over again
-                            if ((nextElement === null || !(nextElement instanceof SpacingNode))) {
-                            // if ( !(rightmostSib !== null && rightmostSib.data instanceof SpacingNode) ) { 
-                                let parentVal: ParentNode | null = null;
-                                if ( !(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value) ) { parentVal = current.context.parent_value; }
-
-                                // when we come back do not try and propogate this node
-                                current.insertRight(new SpacingNode(parentVal, true, true));
-                            }
-
-                            insertRightNext = false;
-                        }
-
-                        // the spacing node IS the focus
-                        // first step left, check if is open tag. if yes, set insert_right_next as true
-                        let stepPrevious = current.goPrevious();
-                        if (stepPrevious.success) {
-                            current = stepPrevious.zipper;
-                            if (stepPrevious.zipper.focus.data instanceof TagNode) {
-                                insertRightNext = true;
-                            } else {
-                                // TODO: check this logic later
-                                backwardLoopVar = false;
-                            }
+                    while (true) {
+                        let goPrev = current.goPrevious();
+                        if (goPrev.success) {
+                            current = goPrev.zipper;
                         } else {
-                            // TODO: This might need to be handled as an error. Break immediately?
-                            break;
+                            break; // Reached the beginning, nothing to do
                         }
-                    }
 
-                    // Finish node
-                    currNode.propogateLeft = true;
-                } else if (!currNode.propogateRight) {
-                    // for every iteration we step forward one, if insertLeftNext true: do it and set false. Check if focus is crossable. If it is then set insertLeftNext true.
-                    let insertLeftNext: boolean = false;
-                    let forwardLoopVar: boolean = true;
-                    while (forwardLoopVar) {
-                        // TODO: messy logic. Having parent values be possibly null is not the best solution
-                        if (insertLeftNext) {
-                            // Check that SpacingNodes do not already exist
-                            let prevNode: ASTNode | null = current.peekPrevious();
-                            // TODO: This logic needs looking over again
-                            if ((prevNode === null || !(prevNode instanceof SpacingNode))) {
-                                let parentVal: ParentNode | null = null;
-                                if ( !(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value) ) { parentVal = current.context.parent_value; }
+                        if (current.focus.data instanceof TagNode) {
+                            // insert spacing node into left sibling tail
+                            let peekPrev = current.peekPrevious();
+                            if (!(peekPrev instanceof SpacingNode)) {
+                                let parentVal: ASTNode | null = null;
+                                if (!(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value)) { parentVal = current.context.parent_value; }
 
-                                // when we come back do not try and propogate this node
                                 current.insertLeft(new SpacingNode(parentVal, true, true));
-                            }
 
-                            insertLeftNext = false;
-                        }
-
-                        // the spacing node IS the focus
-                        // first step forward, check if is close tag. if yes, set insertLeftNext as true
-                        let stepForward = current.goNext();
-                        if (stepForward.success) {
-                            current = stepForward.zipper;
-                            if (stepForward.zipper.focus.data instanceof CloseTagNode) {
-                                insertLeftNext = true;
-                            } else {
-                                // TODO: check this logic later
-                                forwardLoopVar = false;
+                                let goPrev = current.goPrevious();
+                                if (goPrev.success) {
+                                    current = goPrev.zipper;
+                                } else {
+                                    break; // Reached the beginning, nothing to do
+                                }
                             }
                         } else {
-                            // TODO: This might need to be handled as an error. Break immediately?
+                            currNode.propogateLeft = true;
                             break;
                         }
-
                     }
-                
-                    currNode.propogateRight = true;
+                } else if (!currNode.propogateRight) {
+                    while (true) {
+                        let goNext = current.goNext();
+                        if (goNext.success) {
+                            current = goNext.zipper;
+                        } else {
+                            break; // Reached the end
+                        }
+
+                        if (current.focus.data instanceof CloseTagNode) {
+                            // insert SpaceNode to the right
+                            let peekNext = current.peekNext();
+                            if (peekNext === null || !(peekNext instanceof SpacingNode)) {
+                                let parentVal: ParentNode | null = null;
+                                if ( !(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value) ) {
+                                    parentVal = current.context.parent_value;
+                                }
+
+                                if (current.context.parent_context instanceof Context) {
+                                    current.context.parent_context.right_siblings.prepend(new SpacingNode(parentVal, true, true));
+                                }
+                            }
+                        
+                            let goNext = current.goNext();
+                            if (goNext.success) {
+                                current = goNext.zipper;
+                            } else {
+                                break; // This shouldn't happen because we just inserted a node after
+                            }
+                        } else {
+                            currNode.propogateRight = true;
+                            break;
+                        }
+                    }
                 }
 
             }
