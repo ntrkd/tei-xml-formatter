@@ -1,0 +1,30 @@
+{
+  "name": "texfmt",
+  "version": "1.0.0",
+  "description": "format tei xml files",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ntrkd/tei-xml-formatter.git"
+  },
+  "keywords": [
+    "tei-xml",
+    "formatter",
+    "language",
+    "typescript",
+    "ts"
+  ],
+  "author": "ntrkd",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ntrkd/tei-xml-formatter/issues"
+  },
+  "homepage": "https://github.com/ntrkd/tei-xml-formatter#readme",
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}
