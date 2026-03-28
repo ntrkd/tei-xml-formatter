@@ -5,16 +5,8 @@ import * as vscode from 'vscode';
 import { Focus, Top, Zipper, Context, ZipperError, ZipperMod } from './types/zipper';
 import { ChainNode, LinkedList } from './types/linkedList';
 
-// Define what tags are considered <p> like
-const pLike: string[] = ["head", "p"];
-
 const block: string[] = ["head", "p", "div", "body", "text", "TEI", "section"];
 const inline: string[] = ["hi", "note", "salute", "signed"];
-
-type Carry = {
-    left: boolean;
-  right: boolean;
-}
 
 export class Formatter implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TextEdit[]> {
@@ -148,7 +140,13 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         return;
     }
 
-    // rendered string and indent number
+    /**
+     * Recursively render a node recursively by rendering all its children
+     * @param node The node to render
+     * @param parentWrap Whether the node's parent was set to wrap (set false for root node)
+     * @param indentLevel The indent level the current node is already at (set 0 for root node)
+     * @returns [rendered string, indent level]
+     */
     renderNode(node: FMTNode, parentWrap: boolean, indentLevel: number): [string, number] {
         const MAX_WDITH = 80;
         const INDENT_UNIT = '\t';
@@ -205,6 +203,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         return [output, indentLevel];
     }
 
+    /**
+     * Processes a ASTNode tree into a formatting tree
+     * @param tree AST to process
+     * @returns Formatting tree of type Group
+     */
     buildFormattingTree(tree: ASTNode): Group {
         // first make a zipper
         let zipper = new Zipper<ASTNode>(
@@ -292,6 +295,10 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         return fmtTree;
     }
 
+    /**
+     * Helper function to recursively mark the first and last spacing (and whether they are alone) within TagNode
+     * @param node Node to process
+     */
     private markFirstLastSpacingInTags(node: ASTNode): void {
         if (node instanceof TagNode) {
             // find first and last SpacingNode among this TagNodes children
@@ -334,6 +341,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         }
     }
 
+    /**
+     * Propogate spaces across nodes such that the rendered TEI XML document will not change
+     * @param tree Tree to process
+     * @returns AST with spaces propogated
+     */
     propogateSpaces(tree: ASTNode): ASTNode {
         let zipper = new Zipper<ASTNode>(
             new Focus<ASTNode>(tree), 
@@ -344,10 +356,6 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 new LinkedList<ASTNode>()
             )
         );
-
-        // Carrying means inserting another Spacing node after the next node if the node in front of it can be crossed.
-        // If we are carrying left, it can cross only open tags. If we are carrying right, it can cross only close tags.
-        // If the Spacing node will reside next to another Spacing node, do not insert it.
 
         // define the current zipper which will be modified during loop
         let current: Zipper<ASTNode> = zipper;
@@ -447,6 +455,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         }
     }
 
+    /**
+     * Function to convert a FMTNode tree into a string
+     * @param node Tree to be seralized
+     * @returns stringified tree
+     */
     serializeFmt(node: FMTNode): string {
         // Custom replacer to skip the parent property
         return JSON.stringify(node, (key, value) => {
@@ -455,6 +468,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         }, 2); // 2-space indentation for readability
     }
 
+    /**
+     * Function to convert an ASTNode tree into string
+     * @param node Tree to be seralized
+     * @returns stringified tree
+     */
     serializeNode(node: ASTNode): string {
         return JSON.stringify(
             node,
