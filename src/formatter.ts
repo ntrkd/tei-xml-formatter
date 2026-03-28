@@ -30,6 +30,19 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             console.error("There was an error: ", e);
         });
 
+        saxes.on("processinginstruction", (pi) => {
+            let parent: ParentNode = stack[stack.length - 1];
+            parent.children.push(new TextNode(`<?${pi.target}${pi.body !== "" ? ` ${pi.body}` : ``}?>`, parent));
+        });
+
+        saxes.on("xmldecl", dec => { // Always the first line in the XML document
+            let parent: ParentNode = stack[stack.length - 1];
+            parent.children.push(new TextNode(`<?xml
+            version="${dec.version}"${dec.encoding !== undefined ? `
+            encoding="${dec.encoding}"` : ``}${dec.standalone !== undefined ? `
+            standalone="${dec.standalone}"` : ``}?>`, parent));
+        });
+
         saxes.on("opentag", function(tag) {
             let parent: ParentNode = stack[stack.length - 1];
             let node: TagNode = new TagNode(tag.name, tag.isSelfClosing, tag.attributes, undefined, parent);
