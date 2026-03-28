@@ -1,10 +1,11 @@
-> This project is under active development and is not ready for use.
+> This project is under active development, expect breaking changes!
 
 ## What is this?
 
-This repository contains the code for a VSCode extension that formats [TEI XML](https://tei-c.org/) files to be more human readable. It uses [saxes](https://github.com/lddubeau/saxes/) currently to parse XML files and converts the nodes back into text. This formatter expects valid XML files.
+This repository contains the code for a VSCode extension that formats [TEI XML](https://tei-c.org/) files to be more human readable. It uses [saxes](https://github.com/lddubeau/saxes/) to parse XML files into code blocks that can be formatted back into text. This formatter expects valid XML files.
 
 ## Resources Used
+
 Yorick Peterse - [How to write a code formatter](https://yorickpeterse.com/articles/how-to-write-a-code-formatter/)
 
 Gerard Huet - [The Zipper](https://gallium.inria.fr/~huet/PUBLIC/zip.pdf)
@@ -22,6 +23,11 @@ TEI Council - [TEI Specification](https://tei-c.org/release/doc/tei-p5-doc/en/ht
 - Ignore everything but open tags, close tags, and text nodes for now. Comments, CDATA, Processing Instruction, and XML Declaration will be implemented at a later date.
 
 ## Algorithm
+
+### TL;DR
+First uses saxes to parse the .xml file into code which can be processed easier than raw text. First we construct a tree called an Abstract Syntax Tree (AST). This contains enough information to distinguish between Tag Nodes, Close Tag Nodes, Text, and Spaces. Then we take that, process it a bit more and lower it into a Formatting Tree which strips out even more information down to just Groups (contain Text and Space nodes), Text, and Spacing Nodes (Line Indent/Deindent, Space or Line). From here there is very little information to process and most of the formatting has been done. We render the Formatting Tree into raw text again.
+
+### Steps
 
 1. Construct an editable AST tree from the XML file.
 
@@ -62,12 +68,10 @@ TEI Council - [TEI Specification](https://tei-c.org/release/doc/tei-p5-doc/en/ht
     a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
 
 ## TODO
-- [ ] Improve implementation of 5b. by looking at the first next/previous node that is not a spacing node
-- [ ] Make zipper immutable?
-- [ ] Change propogateSpaces method to accept a ASTNode root instead of a Zipper 
+- [ ] Make zipper immutable
 
-## Most Recent Prototype Formatting Demonstration
-The current code was quickly written to see how parts of the algorithm above would function and to spot weaknesses. The output is shown below.
+## Demonstrations
+See below for an example formatting output.
 
 ### Unformatted
 ```xml
@@ -84,9 +88,36 @@ The weather here has been <hi rend="bold">unusually warm</hi> for October.
 </closer></div><hi> 80 808 0808 080808080808 0808008 8 8 08 08 08 80 80 80 8080 8080 8008 080 8080 8080 080 0
 </hi></body></text></TEI>
 ```
-### Formatted
 
-More XML documents will be tested later, but for now work on getting this example to near-perfection. The main issues currently are, intersection between an open/close tag having multiple SpacingNodes pile up casuing those multi-line gaps. Indentation for open/close tags needs to be checked more thoroughly during Formatting tree generation. Current algorithm specification should fix both. However, current algorithm spec does not deal with only having one set of relating spaces render when no wrap is needed. This causes the space between every node as seen in the <closer> tag.
+### Formatted
+Significant improvements over the previous version!
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="custom.xsl"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+	<text>
+		<body>
+			<div type="letter">
+				<head>Letter from Emily to John</head><p><hi rend="italic">Dear John,</hi>
+					<lb />
+					I hope this letter finds you well. The weather here has been
+					<hi rend="bold">unusually warm</hi>
+					for October.
+				</p>
+				<p>I have enclosed the sketches you asked for.
+				<note type="editorial">Original note: “See attached drawings.”</note></p>
+				<closer> <salute> Yours sincerely, </salute> <signed>Emily</signed> </closer>
+			</div>
+			<hi>
+				80 808 0808 080808080808 0808008 8 8 08 08 08 80 80 80 8080 8080 8008 080 8080 8080 080 0
+			</hi>
+		</body>
+	</text>
+</TEI>
+```
+
+### Pre-rewrite Formatted
+Prior to the rewrite (commit 0704c5e) this was the formatting output.
 ```xml
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
 	<text>
