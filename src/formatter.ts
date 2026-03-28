@@ -68,7 +68,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                         parent.children.push(new SpacingNode(parent, false, false));
                     }
 
-                    previousNode.text += joinedProcessedText;
+                    previousNode.text = joinedProcessedText;
                 } else {
                     let spaceAtFirst = text.charAt(0) === " " ? true : false;
                     let spaceAtLast = text.charAt(text.length - 1) === " " ? true : false;
