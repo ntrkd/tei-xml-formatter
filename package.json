@@ -44,7 +44,8 @@
   },
   "dependencies": {
     "he": "^1.2.0",
-    "saxes": "^6.0.0"
+    "saxes": "^6.0.0",
+    "texfmt": "file:./packages/texfmt"
   },
   "workspaces": [
     "packages/*"

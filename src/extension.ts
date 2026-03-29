@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { Formatter } from './formatter';
+import { TEIXMLFormatterProvider } from './formatter';
 
 export function activate(context: vscode.ExtensionContext) {
-	let formatter = new Formatter;
+	let formatter = new TEIXMLFormatterProvider;
 	let selector: vscode.DocumentSelector = { scheme: 'file', language: 'xml' };
 	const formatRegister = vscode.languages.registerDocumentFormattingEditProvider(selector, formatter);
 

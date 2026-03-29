@@ -1,42 +1,57 @@
-import { SaxesParser } from 'saxes';
-import { ParentNode, ASTNode, DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode, BaseParentNode } from './types/ast';
-import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine, FMTNode, Wrap } from './types/fmt';
-import * as vscode from 'vscode';
-import { Focus, Top, Zipper, Context, ZipperError, ZipperMod } from './types/zipper';
-import { ChainNode, LinkedList } from './types/linkedList';
+import { SaxesParser } from "../node_modules/saxes/saxes";
+import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast';
+import { type ParentNode, type ASTNode } from './ast';
+import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt';
+import { type FMTNode } from "./fmt";
+import { Focus, Top, Zipper, Context, ZipperError } from './dataStructures/zipper';
+import { LinkedList } from './dataStructures/linkedList';
 
-const block: string[] = ["head", "p", "div", "body", "text", "TEI", "section"];
-const inline: string[] = ["hi", "note", "salute", "signed"];
+export class Formatter {
+    private saxes: SaxesParser;
 
-export class Formatter implements vscode.DocumentFormattingEditProvider {
-    provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.ProviderResult<vscode.TextEdit[]> {
+    constructor() {
+        this.saxes = new SaxesParser();
+    }
+
+    public format(doc: string): string {
         // lets restart from 1 so each new format doesnt result in crazy long id counts
         SpacingNode.uniqueIDCount = 1;
-        const saxes = new SaxesParser();        
-        const he = require('he');
+        // const he = require('he');
 
         let xmlDoc: DocumentNode = new DocumentNode();
         let stack: ParentNode[] = [ xmlDoc ];
 
-        saxes.on("error", function(e) {
+        this.saxes.on("error", function(e) {
             console.error("There was an error: ", e);
         });
 
-        saxes.on("processinginstruction", (pi) => {
-            let parent: ParentNode = stack[stack.length - 1];
+        this.saxes.on("processinginstruction", (pi) => {
+            let parent: ParentNode | undefined = stack[stack.length - 1];
+            if (!parent) { 
+                throw new Error("Expected element in ParentNode stack but was empty"); 
+            }
+
             parent.children.push(new TextNode(`<?${pi.target}${pi.body !== "" ? ` ${pi.body}` : ``}?>`, parent));
         });
 
-        saxes.on("xmldecl", dec => { // Always the first line in the XML document
-            let parent: ParentNode = stack[stack.length - 1];
+        this.saxes.on("xmldecl", dec => { // Always the first line in the XML document
+            let parent: ParentNode | undefined = stack[stack.length - 1];
+            if (!parent) { 
+                throw new Error("Expected element in ParentNode stack but was empty"); 
+            }
+
             parent.children.push(new TextNode(`<?xml
             version="${dec.version}"${dec.encoding !== undefined ? `
             encoding="${dec.encoding}"` : ``}${dec.standalone !== undefined ? `
             standalone="${dec.standalone}"` : ``}?>`, parent));
         });
 
-        saxes.on("opentag", function(tag) {
-            let parent: ParentNode = stack[stack.length - 1];
+        this.saxes.on("opentag", function(tag) {
+            let parent: ParentNode | undefined = stack[stack.length - 1];
+            if (!parent) { 
+                throw new Error("Expected element in ParentNode stack but was empty"); 
+            }
+
             let node: TagNode = new TagNode(tag.name, tag.isSelfClosing, tag.attributes, undefined, parent);
             parent.children.push(node);
             if (!tag.isSelfClosing) {
@@ -44,7 +59,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             }
         });
 
-        saxes.on("closetag", function(tag) {
+        this.saxes.on("closetag", function(tag) {
             if (stack.length !== 0 && !tag.isSelfClosing) {
                 let openTag: ParentNode = stack.pop()!;
                 if (openTag instanceof TagNode) {
@@ -53,12 +68,15 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
             }
         });
 
-        saxes.on("text", function(text) {
+        this.saxes.on("text", function(text) {
             text = text.replace(/[\n\t ]+/g, ' ');
 
             if (text !== "") {
-                let parent: ParentNode = stack[stack.length - 1];
-                let previousNode: ASTNode = parent.children[parent.children.length - 1];
+                let parent: ParentNode | undefined = stack[stack.length - 1];
+                if (!parent) { 
+                    throw new Error("Expected element in ParentNode stack but was empty"); 
+                }
+                let previousNode: ASTNode | undefined = parent.children[parent.children.length - 1];
 
                 if (previousNode instanceof TextNode) {
                     let joinedProcessedText = (previousNode.text + text).replace(/[\n\t ]+/g, ' ');
@@ -106,38 +124,14 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
                 }}
         });
 
-        saxes.write(document.getText()).close();
+        this.saxes.write(doc).close();
 
-        const folder = vscode.workspace.workspaceFolders?.[0];
-        if (!folder) {
-            vscode.window.showErrorMessage("No workspace open");
-            return;
-        }
+        const propogateSpaces = this.propogateSpaces(xmlDoc);
+        this.markFirstLastSpacingInTags(propogateSpaces);
+        const fmtTree = this.buildFormattingTree(propogateSpaces);
+        const formattedFile = this.renderNode(fmtTree, false, 0);
 
-        const astFile = vscode.Uri.joinPath(folder.uri, "ast.json");
-        // this.printDocumentNodeInfo(xmlDoc, astFile);
-        const xmlNodesPrint = this.serializeNode(xmlDoc);
-        vscode.workspace.fs.writeFile(astFile, Buffer.from(xmlNodesPrint));
-
-        let propogatedTree = this.propogateSpaces(xmlDoc);
-        this.markFirstLastSpacingInTags(propogatedTree);
-
-        const spaceZip = vscode.Uri.joinPath(folder.uri, "zip.json");
-        // this.printZipperInfo(zipper, spaceZip);
-        const serializedZip = this.serializeNode(propogatedTree);
-        vscode.workspace.fs.writeFile(spaceZip, Buffer.from(serializedZip));
-
-        const fmtTree = this.buildFormattingTree(propogatedTree);
-        const fmtFile = vscode.Uri.joinPath(folder.uri, "fmt.json");
-        // this.printZipperInfo(zipper, spaceZip);
-        const serializedFmt = this.serializeFmt(fmtTree);
-        vscode.workspace.fs.writeFile(fmtFile, Buffer.from(serializedFmt));
-
-        let output = this.renderNode(fmtTree, false, 0);
-        const formattedFile = vscode.Uri.joinPath(folder.uri, "fmt.xml");
-        vscode.workspace.fs.writeFile(formattedFile, Buffer.from(output[0]));
-
-        return;
+        return formattedFile[0];
     }
 
     /**
@@ -147,7 +141,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
      * @param indentLevel The indent level the current node is already at (set 0 for root node)
      * @returns [rendered string, indent level]
      */
-    renderNode(node: FMTNode, parentWrap: boolean, indentLevel: number): [string, number] {
+    private renderNode(node: FMTNode, parentWrap: boolean, indentLevel: number): [string, number] {
         const MAX_WDITH = 80;
         const INDENT_UNIT = '\t';
         const NEWLINE = '\n';
@@ -208,7 +202,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
      * @param tree AST to process
      * @returns Formatting tree of type Group
      */
-    buildFormattingTree(tree: ASTNode): Group {
+    private buildFormattingTree(tree: ASTNode): Group {
         // first make a zipper
         let zipper = new Zipper<ASTNode>(
             new Focus<ASTNode>(tree), 
@@ -226,7 +220,11 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
         // setup a loop to go until the end (!success)
         while (true) {
             // do logic
-            let stackTop: Group = fmtStack[fmtStack.length - 1];
+            let stackTop: Group | undefined = fmtStack[fmtStack.length - 1];
+            if (!stackTop) {
+                throw new Error("Expected FMTNode tree stack to be populated but was empty");
+            }
+
             // decide what type the current focus is
             let focus: ASTNode = zipper.focus.data;
 
@@ -346,7 +344,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
      * @param tree Tree to process
      * @returns AST with spaces propogated
      */
-    propogateSpaces(tree: ASTNode): ASTNode {
+    private propogateSpaces(tree: ASTNode): ASTNode {
         let zipper = new Zipper<ASTNode>(
             new Focus<ASTNode>(tree), 
             new Context<ASTNode>(
@@ -460,7 +458,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
      * @param node Tree to be seralized
      * @returns stringified tree
      */
-    serializeFmt(node: FMTNode): string {
+    private serializeFmt(node: FMTNode): string {
         // Custom replacer to skip the parent property
         return JSON.stringify(node, (key, value) => {
             if (key === 'parent') { return undefined; } // skip circular reference
@@ -473,7 +471,7 @@ export class Formatter implements vscode.DocumentFormattingEditProvider {
      * @param node Tree to be seralized
      * @returns stringified tree
      */
-    serializeNode(node: ASTNode): string {
+    private serializeNode(node: ASTNode): string {
         return JSON.stringify(
             node,
             (key, value) => {
