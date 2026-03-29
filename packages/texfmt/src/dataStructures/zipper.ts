@@ -47,7 +47,7 @@ export enum ZipperError {
 
 export type ZipperMod<T extends object> =
     | { success: true; zipper: Zipper<T> }
-    | { success: false; reason: ZipperError; message?: string };
+    | { success: false; reason: ZipperError; message?: string | undefined };
 
 export class Zipper<T extends object> {
     focus: Focus<T>;
@@ -76,7 +76,7 @@ export class Zipper<T extends object> {
         const rightSiblings = new LinkedList<T>();
         if (children.length >= 2) {
             for (let i = 1; i < children.length; i++) {
-                rightSiblings.append(children[i]);
+                rightSiblings.append(children[i]!);
             }
         }
 
@@ -87,7 +87,7 @@ export class Zipper<T extends object> {
             rightSiblings
         );
 
-        return { success: true, zipper: new Zipper<T>(new Focus<T>(children[0]), newContext) };
+        return { success: true, zipper: new Zipper<T>(new Focus<T>(children[0]!), newContext) };
     }
 
     // Method: goUp()    // Reconstructs parent from focus and siblings
@@ -261,7 +261,7 @@ export class Zipper<T extends object> {
     peekNext(): T | null {
         // try to go down
         if (this.hasChildren(this.focus.data) && this.focus.data.children && this.focus.data.children.length > 0) {
-            return this.focus.data.children[0];
+            return this.focus.data.children[0]!;
         }
 
         // try to go right
@@ -299,7 +299,7 @@ export class Zipper<T extends object> {
                 while (this.hasChildren(current) && current.children && current.children.length > 0) {
                     current = current.children[current.children.length - 1];
                 }
-                return current;
+                return current!;
             } else {
                 return leftNode;
             }

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { TEIXMLFormatterProvider } from './formatter';
+import { TEIXMLFormatterProvider } from './formatProvider';
 
 export function activate(context: vscode.ExtensionContext) {
 	let formatter = new TEIXMLFormatterProvider;
