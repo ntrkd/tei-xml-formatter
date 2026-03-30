@@ -1,8 +1,8 @@
 import { SaxesParser } from 'saxes';
 import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast';
-import { type ParentNode, type ASTNode } from './ast';
+import type { ParentNode, ASTNode } from './ast';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt';
-import { type FMTNode } from "./fmt";
+import type { FMTNode } from "./fmt";
 import { Focus, Top, Zipper, Context, ZipperError } from './dataStructures/zipper';
 import { LinkedList } from './dataStructures/linkedList';
 
@@ -18,15 +18,15 @@ export class Formatter {
         SpacingNode.uniqueIDCount = 1;
         // const he = require('he');
 
-        let xmlDoc: DocumentNode = new DocumentNode();
-        let stack: ParentNode[] = [ xmlDoc ];
+        const xmlDoc: DocumentNode = new DocumentNode();
+        const stack: ParentNode[] = [ xmlDoc ];
 
-        this.saxes.on("error", function(e) {
+        this.saxes.on("error", (e) => {
             console.error("There was an error: ", e);
         });
 
         this.saxes.on("processinginstruction", (pi) => {
-            let parent: ParentNode | undefined = stack[stack.length - 1];
+            const parent: ParentNode | undefined = stack[stack.length - 1];
             if (!parent) { 
                 throw new Error("Expected element in ParentNode stack but was empty"); 
             }
@@ -35,7 +35,7 @@ export class Formatter {
         });
 
         this.saxes.on("xmldecl", dec => { // Always the first line in the XML document
-            let parent: ParentNode | undefined = stack[stack.length - 1];
+            const parent: ParentNode | undefined = stack[stack.length - 1];
             if (!parent) { 
                 throw new Error("Expected element in ParentNode stack but was empty"); 
             }
@@ -46,37 +46,37 @@ export class Formatter {
             standalone="${dec.standalone}"` : ``}?>`, parent));
         });
 
-        this.saxes.on("opentag", function(tag) {
-            let parent: ParentNode | undefined = stack[stack.length - 1];
+        this.saxes.on("opentag", (tag) => {
+            const parent: ParentNode | undefined = stack[stack.length - 1];
             if (!parent) { 
                 throw new Error("Expected element in ParentNode stack but was empty"); 
             }
 
-            let node: TagNode = new TagNode(tag.name, tag.isSelfClosing, tag.attributes, undefined, parent);
+            const node: TagNode = new TagNode(tag.name, tag.isSelfClosing, tag.attributes, undefined, parent);
             parent.children.push(node);
             if (!tag.isSelfClosing) {
                 stack.push(node);
             }
         });
 
-        this.saxes.on("closetag", function(tag) {
+        this.saxes.on("closetag", (tag) => {
             if (stack.length !== 0 && !tag.isSelfClosing) {
-                let openTag: ParentNode = stack.pop()!;
+                const openTag: ParentNode = stack.pop()!;
                 if (openTag instanceof TagNode) {
                     openTag.children.push(new CloseTagNode(tag.name, openTag));
                 }
             }
         });
 
-        this.saxes.on("text", function(text) {
+        this.saxes.on("text", (text) => {
             text = text.replace(/[\n\t ]+/g, ' ');
 
             if (text !== "") {
-                let parent: ParentNode | undefined = stack[stack.length - 1];
+                const parent: ParentNode | undefined = stack[stack.length - 1];
                 if (!parent) { 
                     throw new Error("Expected element in ParentNode stack but was empty"); 
                 }
-                let previousNode: ASTNode | undefined = parent.children[parent.children.length - 1];
+                const previousNode: ASTNode | undefined = parent.children[parent.children.length - 1];
 
                 if (previousNode instanceof TextNode) {
                     let joinedProcessedText = (previousNode.text + text).replace(/[\n\t ]+/g, ' ');
@@ -93,9 +93,9 @@ export class Formatter {
 
                     previousNode.text = joinedProcessedText;
                 } else {
-                    let spaceAtFirst = text.charAt(0) === " " ? true : false;
-                    let spaceAtLast = text.charAt(text.length - 1) === " " ? true : false;
-                    let textNode = new TextNode(text, parent); // Reference to edit obj later
+                    const spaceAtFirst = text.charAt(0) === " " ? true : false;
+                    const spaceAtLast = text.charAt(text.length - 1) === " " ? true : false;
+                    const textNode = new TextNode(text, parent); // Reference to edit obj later
 
                     // If text node is just a single space
                     if (textNode.text === " ") {
@@ -147,7 +147,7 @@ export class Formatter {
         const NEWLINE = '\n';
 
         let output = '';
-        let nodeWrap: boolean = node.width() > MAX_WDITH;
+        const nodeWrap: boolean = node.width() > MAX_WDITH;
 
         // if the parent is wrapping then every new group gets its own newline
         // if the parent decides to wrap, the child can decide to not wrap
@@ -155,7 +155,7 @@ export class Formatter {
         if (node instanceof Group) {
             // call render node on all children and add em up
             for (const child of node.nodes) {
-                let renderChild = this.renderNode(child, nodeWrap, indentLevel);
+                const renderChild = this.renderNode(child, nodeWrap, indentLevel);
                 output += renderChild[0];
                 indentLevel = renderChild[1];
             } 
@@ -214,34 +214,34 @@ export class Formatter {
             )
         );
 
-        let fmtTree: Group = new Group([]);
-        let fmtStack: Group[] = [ fmtTree ];
+        const fmtTree: Group = new Group([]);
+        const fmtStack: Group[] = [ fmtTree ];
 
         // setup a loop to go until the end (!success)
         while (true) {
             // do logic
-            let stackTop: Group | undefined = fmtStack[fmtStack.length - 1];
+            const stackTop: Group | undefined = fmtStack[fmtStack.length - 1];
             if (!stackTop) {
                 throw new Error("Expected FMTNode tree stack to be populated but was empty");
             }
 
             // decide what type the current focus is
-            let focus: ASTNode = zipper.focus.data;
+            const focus: ASTNode = zipper.focus.data;
 
             if (focus instanceof DocumentNode) {
                 // this node renders to nothing
             } else if (focus instanceof TagNode) {
                 // needs a new group attached, stack increased, and tag node textualized and added to the new group
-                let attrStr = Object.entries(focus.attributes).map(([k, v]) => ` ${k}="${v}"`).join('');
-                let tagText = `<${focus.name}${attrStr}${focus.selfClosing ? ' /' : ''}>`;
-                let newGroup = new Group([new Text(tagText)]);
+                const attrStr = Object.entries(focus.attributes).map(([k, v]) => ` ${k}="${v}"`).join('');
+                const tagText = `<${focus.name}${attrStr}${focus.selfClosing ? ' /' : ''}>`;
+                const newGroup = new Group([new Text(tagText)]);
                 stackTop.nodes.push(newGroup);
                 if (!focus.selfClosing) {
                     fmtStack.push(newGroup);
                 }
             } else if (focus instanceof CloseTagNode) {
                 // textualized and added to most recent group, then pop the stack
-                let closeText = `</${focus.name}>`;
+                const closeText = `</${focus.name}>`;
                 stackTop.nodes.push(new Text(closeText));
                 fmtStack.pop();
             } else if (focus instanceof TextNode) {
@@ -249,8 +249,8 @@ export class Formatter {
                 stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
                 // handled per 3b. in the algorithm spec
-                let prevNode = zipper.peekPrevious();
-                let nextNode = zipper.peekNext();
+                const prevNode = zipper.peekPrevious();
+                const nextNode = zipper.peekNext();
                 let space: FMTNode;
 
                 if (focus.onlySpace) {
@@ -279,7 +279,7 @@ export class Formatter {
             }
 
 
-            let next = zipper.goNext();
+            const next = zipper.goNext();
 
             // check for break;
             if (!next.success) {
@@ -345,7 +345,7 @@ export class Formatter {
      * @returns AST with spaces propogated
      */
     private propogateSpaces(tree: ASTNode): ASTNode {
-        let zipper = new Zipper<ASTNode>(
+        const zipper = new Zipper<ASTNode>(
             new Focus<ASTNode>(tree), 
             new Context<ASTNode>(
                 new LinkedList<ASTNode>(), 
@@ -360,7 +360,7 @@ export class Formatter {
 
         // For loop keep going next() until we hit the end
         while (true) {
-            let next = current.goNext();
+            const next = current.goNext();
             if (next.success) {
                 current = next.zipper;
             } else if (next.reason === ZipperError.AT_END) {
@@ -370,12 +370,12 @@ export class Formatter {
             }
 
             // check if we are at SpacingNode
-            let currNode = current.focus.data;
+            const currNode = current.focus.data;
             if (currNode instanceof SpacingNode) {
                 // if Spacing Node has propogateLeft as false
                 if (!currNode.propogateLeft) {
                     while (true) {
-                        let goPrev = current.goPrevious();
+                        const goPrev = current.goPrevious();
                         if (goPrev.success) {
                             current = goPrev.zipper;
                         } else {
@@ -384,14 +384,14 @@ export class Formatter {
 
                         if (current.focus.data instanceof TagNode) {
                             // insert spacing node into left sibling tail
-                            let peekPrev = current.peekPrevious();
+                            const peekPrev = current.peekPrevious();
                             if (!(peekPrev instanceof SpacingNode)) {
                                 let parentVal: ASTNode | null = null;
                                 if (!(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value)) { parentVal = current.context.parent_value; }
 
                                 current.insertLeft(new SpacingNode(parentVal, true, true));
 
-                                let goPrev = current.goPrevious();
+                                const goPrev = current.goPrevious();
                                 if (goPrev.success) {
                                     current = goPrev.zipper;
                                 } else {
@@ -405,7 +405,7 @@ export class Formatter {
                     }
                 } else if (!currNode.propogateRight) {
                     while (true) {
-                        let goNext = current.goNext();
+                        const goNext = current.goNext();
                         if (goNext.success) {
                             current = goNext.zipper;
                         } else {
@@ -414,7 +414,7 @@ export class Formatter {
 
                         if (current.focus.data instanceof CloseTagNode) {
                             // insert SpaceNode to the right
-                            let peekNext = current.peekNext();
+                            const peekNext = current.peekNext();
                             if (peekNext === null || !(peekNext instanceof SpacingNode)) {
                                 let parentVal: ParentNode | null = null;
                                 if ( !(current.context.parent_value instanceof Top) && isParentNode(current.context.parent_value) ) {
@@ -426,7 +426,7 @@ export class Formatter {
                                 }
                             }
                         
-                            let goNext = current.goNext();
+                            const goNext = current.goNext();
                             if (goNext.success) {
                                 current = goNext.zipper;
                             } else {
@@ -444,7 +444,7 @@ export class Formatter {
         
         // once all the looping is done, all spaces should be propogated
 
-        let goTop = current.goTop();
+        const goTop = current.goTop();
         if (goTop.success) {
             return goTop.zipper.focus.data;
         } else {

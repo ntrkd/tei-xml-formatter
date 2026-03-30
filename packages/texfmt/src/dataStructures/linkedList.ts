@@ -29,15 +29,15 @@ export class LinkedList<T> {
 
     append(data: T): void {
         if (this.state.size === 0) {
-            let node = new ChainNode<T>(data, null, null);
+            const node = new ChainNode<T>(data, null, null);
             this.state = { head: node, tail: node, size: 1 };
         } else {
             if (this.state.tail === null) {
                 throw new Error(this.nullSurpriseError);
             }
 
-            let currentTail = this.state.tail;
-            let node = new ChainNode<T>(data, currentTail, null);
+            const currentTail = this.state.tail;
+            const node = new ChainNode<T>(data, currentTail, null);
             this.state.tail = node;
             currentTail.next = node;
             this.state.size++;
@@ -46,15 +46,15 @@ export class LinkedList<T> {
 
     prepend(data: T): void {
         if (this.state.size === 0) {
-            let node = new ChainNode<T>(data, null, null);
+            const node = new ChainNode<T>(data, null, null);
             this.state = { head: node, tail: node, size: 1 };
         } else {
             if (this.state.head === null) {
                 throw new Error(this.nullSurpriseError);
             }
 
-            let currentHead = this.state.head;
-            let node = new ChainNode<T>(data, null, currentHead);
+            const currentHead = this.state.head;
+            const node = new ChainNode<T>(data, null, currentHead);
             this.state.head = node;
             currentHead.previous = node;
             this.state.size++;
@@ -77,8 +77,8 @@ export class LinkedList<T> {
                 } else if (current === this.state.tail) {
                     this.deleteTail();
                 } else {
-                    let prev = current.previous;
-                    let next = current.next;
+                    const prev = current.previous;
+                    const next = current.next;
                     if (prev === null || next === null) {
                         throw new Error(this.nullSurpriseError);
                     }
@@ -104,10 +104,10 @@ export class LinkedList<T> {
             return null;
         }
 
-        let current: ChainNode<T> | null = this.state.head;
+        const current: ChainNode<T> | null = this.state.head;
         if (current === null) { return null; }
 
-        let next = current.next;
+        const next = current.next;
         if (next === null) {
             throw new Error(this.nullSurpriseError);
         }
@@ -125,10 +125,10 @@ export class LinkedList<T> {
             return null;
         }
 
-        let current: ChainNode<T> | null = this.state.tail;
+        const current: ChainNode<T> | null = this.state.tail;
         if (current === null) { return null; }
 
-        let prev = current.previous;
+        const prev = current.previous;
         if (prev === null) {
             throw new Error(this.nullSurpriseError);
         }
@@ -142,7 +142,7 @@ export class LinkedList<T> {
     private sizeOneDeleteHelper(): ChainNode<T> | null {
         if (this.state.head === null) { return null; }
 
-        let deleted = this.state.head;
+        const deleted = this.state.head;
         this.state = { head: null, tail: null, size: 0};
         return deleted;
     }

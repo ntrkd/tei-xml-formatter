@@ -98,13 +98,13 @@ export class Zipper<T extends object> {
         }
 
         const parentContext = this.context.parent_context as Context<T>;
-        let parent: T = this.context.parent_value as T;
+        const parent: T = this.context.parent_value as T;
         
         if (!this.hasChildren(parent)) {
             return { success: false, reason: ZipperError.PARENT_HAS_NO_CHILDREN };
         }
 
-        let childrenArr: T[] = [];
+        const childrenArr: T[] = [];
         
         // Loop through left siblings and append to childrenArr
         let current = this.context.left_siblings.getHead();
@@ -125,7 +125,7 @@ export class Zipper<T extends object> {
         
         parent.children = childrenArr;
 
-        let newContext = new Context<T>(
+        const newContext = new Context<T>(
             this.context.parent_context.left_siblings, 
             this.context.parent_context.parent_context, 
             this.context.parent_context.parent_value, 
@@ -144,12 +144,12 @@ export class Zipper<T extends object> {
         // Prepend focus into right_sib
         this.context.right_siblings.prepend(this.focus.data);
         
-        let newFocus = this.context.left_siblings.deleteTail()?.data;
+        const newFocus = this.context.left_siblings.deleteTail()?.data;
         if (newFocus === undefined) {
             throw new Error("Expected a non-null return from LinkedList while deleting tail but got null");
         }
 
-        let newContext = new Context<T>(
+        const newContext = new Context<T>(
             this.context.left_siblings,
             this.context.parent_context,
             this.context.parent_value,
@@ -167,12 +167,12 @@ export class Zipper<T extends object> {
         
         this.context.left_siblings.append(this.focus.data);
         
-        let newFocus = this.context.right_siblings.deleteHead()?.data;
+        const newFocus = this.context.right_siblings.deleteHead()?.data;
         if (newFocus === undefined) {
             throw new Error("Expected a non-null return from LinkedList while deleting head but got null");
         }
 
-        let newContext = new Context<T>(
+        const newContext = new Context<T>(
             this.context.left_siblings,
             this.context.parent_context,
             this.context.parent_value,
@@ -185,7 +185,7 @@ export class Zipper<T extends object> {
     // goNext()
     goNext(): ZipperMod<T> {
         // try to go down
-        let goDown = this.goDown();
+        const goDown = this.goDown();
 
         if (goDown.success) {
             return goDown;
@@ -201,7 +201,7 @@ export class Zipper<T extends object> {
         // loop go up and go right until go right works or we cant go up anymore
         let current: Zipper<T> = this;
         do {
-            let goUp = current.goUp();
+            const goUp = current.goUp();
 
             if (goUp.success) {
                 goRight = goUp.zipper.goRight();
@@ -225,16 +225,16 @@ export class Zipper<T extends object> {
     goPrevious(): ZipperMod<T> {
         // go left
         // if successful find if it has children and move to the final child
-        let goLeft = this.goLeft();
+        const goLeft = this.goLeft();
         if (goLeft.success) {
             // find child
-            let goDown = goLeft.zipper.goDown();
+            const goDown = goLeft.zipper.goDown();
             if (goDown.success) {
                 let current: ZipperMod<T> = goDown;
 
                 // loop goRight until we can't anymore and return goRight
                 while (true) {
-                    let currentShifted: ZipperMod<T> = current.zipper.goRight();
+                    const currentShifted: ZipperMod<T> = current.zipper.goRight();
                     if (currentShifted.success) {
                         current = currentShifted;
                     } else {
@@ -249,7 +249,7 @@ export class Zipper<T extends object> {
         }
 
         // go up
-        let goUp: ZipperMod<T> = this.goUp();
+        const goUp: ZipperMod<T> = this.goUp();
         if (goUp.success) {
             return goUp;
         } else {
@@ -276,7 +276,7 @@ export class Zipper<T extends object> {
                 return null;
             }
 
-            let parentContext = currentContext.parent_context as Context<T>;
+            const parentContext = currentContext.parent_context as Context<T>;
 
             // try go right on parent level
             if (parentContext.right_siblings.getSize() > 0) {
@@ -291,7 +291,7 @@ export class Zipper<T extends object> {
     peekPrevious(): T | null {
         // try to go left
         if (this.context.left_siblings.getSize() > 0) {
-            let leftNode = this.context.left_siblings.getTail()!.data;
+            const leftNode = this.context.left_siblings.getTail()!.data;
 
             // if it has children, go to the deepest rightmost child
             if (this.hasChildren(leftNode) && leftNode.children && leftNode.children.length > 0) {
@@ -320,7 +320,6 @@ export class Zipper<T extends object> {
             const prev = current.goPrevious();
             if (prev.success) {
                 current = prev.zipper;
-                continue;
             } else {
                 if (prev.reason === ZipperError.AT_ROOT) {
                     return { success: true, zipper: current };
@@ -339,7 +338,7 @@ export class Zipper<T extends object> {
 
     // Method: insertLeft(Tree tree)   // Adds a sibling to the left
     insertLeft(node: T): Zipper<T> {
-        let leftSibling = this.context.left_siblings;
+        const leftSibling = this.context.left_siblings;
         leftSibling.append(node);
 
         return new Zipper<T>(
@@ -355,7 +354,7 @@ export class Zipper<T extends object> {
 
     // Method: insertRight(Tree tree)  // Adds a sibling to the right
     insertRight(node: T): Zipper<T> {
-        let rightSibling = this.context.right_siblings;
+        const rightSibling = this.context.right_siblings;
         rightSibling.prepend(node);
 
         return new Zipper<T>(
@@ -375,7 +374,7 @@ export class Zipper<T extends object> {
      * @returns Zipper object if insertion was successful else null
      */
     insertDown(node: T): ZipperMod<T> {
-        let newData = this.focus.data;
+        const newData = this.focus.data;
         
         // Type guards
         if (!this.hasChildren(newData)) {
