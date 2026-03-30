@@ -6,11 +6,38 @@ import type { FMTNode } from "./fmt";
 import { Focus, Top, Zipper, Context, ZipperError } from './dataStructures/zipper';
 import { LinkedList } from './dataStructures/linkedList';
 
+export enum FormatterErrorCode {
+    ParserError = 'ParserError',
+    ParentStackEmpty = 'ParentStackEmpty',
+    FmtStackEmpty = 'FmtStackEmpty',
+    ZipperGoTopFailed = 'ZipperGoTopFailed',
+    UnexpectedZipperState = 'UnexpectedZipperState',
+}
+
+export class FormatterError extends Error {
+    public readonly code: FormatterErrorCode;
+    public override readonly cause?: Error;
+
+    constructor(code: FormatterErrorCode, message: string, cause?: Error) {
+        super(message, { cause });
+        this.name = 'FormatterError';
+        this.code = code;
+    }
+}
+
+export type FormatterErrorType = FormatterErrorCode;
+
 export class Formatter {
     private saxes: SaxesParser;
 
     constructor() {
         this.saxes = new SaxesParser();
+    }
+
+    private assert(condition: boolean, code: FormatterErrorCode, message: string): asserts condition {
+        if (!condition) {
+            throw new FormatterError(code, message);
+        }
     }
 
     public format(doc: string): string {
@@ -22,23 +49,19 @@ export class Formatter {
         const stack: ParentNode[] = [ xmlDoc ];
 
         this.saxes.on("error", (e) => {
-            console.error("There was an error: ", e);
+            throw new FormatterError(FormatterErrorCode.ParserError, 'SAX parser error', e);
         });
 
         this.saxes.on("processinginstruction", (pi) => {
             const parent: ParentNode | undefined = stack[stack.length - 1];
-            if (!parent) { 
-                throw new Error("Expected element in ParentNode stack but was empty"); 
-            }
+            this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
             parent.children.push(new TextNode(`<?${pi.target}${pi.body !== "" ? ` ${pi.body}` : ``}?>`, parent));
         });
 
         this.saxes.on("xmldecl", dec => { // Always the first line in the XML document
             const parent: ParentNode | undefined = stack[stack.length - 1];
-            if (!parent) { 
-                throw new Error("Expected element in ParentNode stack but was empty"); 
-            }
+            this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
             const encoding = dec.encoding !== undefined ? ` encoding="${dec.encoding}"` : ``;
             const standalone = dec.standalone !== undefined ? ` standalone="${dec.standalone}"` : ``;
@@ -47,9 +70,7 @@ export class Formatter {
 
         this.saxes.on("opentag", (tag) => {
             const parent: ParentNode | undefined = stack[stack.length - 1];
-            if (!parent) { 
-                throw new Error("Expected element in ParentNode stack but was empty"); 
-            }
+            this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
             const node: TagNode = new TagNode(tag.name, tag.isSelfClosing, tag.attributes, undefined, parent);
             parent.children.push(node);
@@ -72,9 +93,7 @@ export class Formatter {
 
             if (text !== "") {
                 const parent: ParentNode | undefined = stack[stack.length - 1];
-                if (!parent) { 
-                    throw new Error("Expected element in ParentNode stack but was empty"); 
-                }
+                this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
                 const previousNode: ASTNode | undefined = parent.children[parent.children.length - 1];
 
                 if (previousNode instanceof TextNode) {
@@ -220,9 +239,7 @@ export class Formatter {
         while (true) {
             // do logic
             const stackTop: Group | undefined = fmtStack[fmtStack.length - 1];
-            if (!stackTop) {
-                throw new Error("Expected FMTNode tree stack to be populated but was empty");
-            }
+            this.assert(!!stackTop, FormatterErrorCode.FmtStackEmpty, "Expected FMTNode tree stack to be populated but was empty");
 
             // decide what type the current focus is
             const focus: ASTNode = zipper.focus.data;
@@ -365,7 +382,7 @@ export class Formatter {
             } else if (next.reason === ZipperError.AT_END) {
                 break;
             } else {
-                // TODO: This part should never trigger, lets post an error
+                throw new FormatterError(FormatterErrorCode.UnexpectedZipperState, `Unexpected zipper state while propagating spaces: ${next.reason}`);
             }
 
             // check if we are at SpacingNode
@@ -429,7 +446,8 @@ export class Formatter {
                             if (goNext.success) {
                                 current = goNext.zipper;
                             } else {
-                                break; // This shouldn't happen because we just inserted a node after
+                                // We just inserted an node in front, should never trigger
+                                throw new FormatterError(FormatterErrorCode.UnexpectedZipperState, `Unexpected zipper state while propagating spaces: ${goNext.reason}`);
                             }
                         } else {
                             currNode.propogateRight = true;
@@ -447,8 +465,7 @@ export class Formatter {
         if (goTop.success) {
             return goTop.zipper.focus.data;
         } else {
-            // TODO: This needs error handling, should never happen
-            return current.focus.data;
+            throw new FormatterError(FormatterErrorCode.ZipperGoTopFailed, 'Could not rewind to root after space propagation');
         }
     }
 
