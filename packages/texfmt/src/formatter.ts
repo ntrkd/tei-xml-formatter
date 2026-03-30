@@ -40,10 +40,9 @@ export class Formatter {
                 throw new Error("Expected element in ParentNode stack but was empty"); 
             }
 
-            parent.children.push(new TextNode(`<?xml
-            version="${dec.version}"${dec.encoding !== undefined ? `
-            encoding="${dec.encoding}"` : ``}${dec.standalone !== undefined ? `
-            standalone="${dec.standalone}"` : ``}?>`, parent));
+            const encoding = dec.encoding !== undefined ? ` encoding="${dec.encoding}"` : ``;
+            const standalone = dec.standalone !== undefined ? ` standalone="${dec.standalone}"` : ``;
+            parent.children.push(new TextNode(`<?xml version="${dec.version}"${encoding}${standalone}?>`, parent));
         });
 
         this.saxes.on("opentag", (tag) => {
