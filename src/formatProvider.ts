@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Formatter } from '../packages/texfmt/src/formatter';
+import { Formatter } from 'texfmt';
 
 const block: string[] = ["head", "p", "div", "body", "text", "TEI", "section"];
 const inline: string[] = ["hi", "note", "salute", "signed"];

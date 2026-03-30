@@ -5,7 +5,9 @@
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/types/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     "./package.json": "./package.json",
     ".": {
@@ -34,12 +36,15 @@
   "scripts": {
     "start": "tsc --watch",
     "build": "tsc && tsc-alias -p tsconfig.json",
-    "postbuild": "esm2cjs --in dist/esm --out dist/cjs -l error",
+    "postbuild": "esm2cjs --in ./dist/esm --out ./dist/cjs -l error",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
     "@alcalzone/esm2cjs": "^1.1.2",
     "tsc-alias": "^1.8.8",
     "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "saxes": "^6.0.0"
   }
 }

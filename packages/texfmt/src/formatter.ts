@@ -1,4 +1,4 @@
-import { SaxesParser } from "../node_modules/saxes/saxes";
+import { SaxesParser } from 'saxes';
 import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast';
 import { type ParentNode, type ASTNode } from './ast';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt';
