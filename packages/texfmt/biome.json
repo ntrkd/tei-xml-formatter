@@ -8,6 +8,9 @@
             "correctness": {
                 "noUnusedVariables": "info",
                 "noUnusedPrivateClassMembers": "info"
+            },
+            "style": {
+                "noInferrableTypes": "error"
             }
         }
     }

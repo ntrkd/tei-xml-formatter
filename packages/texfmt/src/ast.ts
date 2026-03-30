@@ -111,7 +111,7 @@ export class TextNode implements BaseASTNode {
 // add a property propogatedLeft and propogatedRight to keep track
 // of which nodes have been propogated left and right
 export class SpacingNode implements BaseASTNode {
-    static uniqueIDCount: number = 1;
+    static uniqueIDCount = 1;
     kind = 'Spacing' as const;
     parent: ParentNode | null;
     id: number;

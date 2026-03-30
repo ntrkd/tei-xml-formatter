@@ -17,7 +17,7 @@ export class Group implements BaseFMTNode {
   }
 
   width() : number {
-    let width: number = 0;
+    let width = 0;
 
     for (var n of this.nodes) {
       width += n.width();

@@ -319,7 +319,7 @@ export class Formatter {
             let firstSpacing: SpacingNode | null = null;
             let lastSpacing: SpacingNode | null = null;
             let lastSpace: SpacingNode | null = null;
-            let numSpaces: number = 0;
+            let numSpaces = 0;
             
             for (const child of node.children) {
                 if (child instanceof SpacingNode) {
