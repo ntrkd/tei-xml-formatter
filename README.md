@@ -68,7 +68,7 @@ First uses saxes to parse the .xml file into code which can be processed easier 
     a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
 
 ## TODO
-- [ ] Make zipper immutable
+- [ ] add tests for everything
 
 ## Demonstrations
 See below for an example formatting output.
