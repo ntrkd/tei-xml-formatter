@@ -3,17 +3,7 @@ import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNod
 import type { ParentNode, ASTNode } from './ast.js';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
 import type { FMTNode } from "./fmt.js";
-import {
-	ContextVariant,
-	goNext,
-	peekNext,
-	goPrevious,
-	peekPrevious,
-	insertLeft,
-	insertRight,
-	goTop,
-	ZipperError,
-} from './zipper.js';
+import * as zip from './zipper.js';
 import type {
 	Zipper,
 	ZipperAdapter,
@@ -82,7 +72,7 @@ export class Formatter {
 
         return {
             focus: tree,
-            context: { kind: ContextVariant.ROOT },
+            context: { kind: zip.ContextVariant.ROOT },
             adapter,
         };
     }
@@ -304,8 +294,8 @@ export class Formatter {
                 stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
                 // handled per 3b. in the algorithm spec
-                const prevNodeResult = peekPrevious(zipper);
-                const nextNodeResult = peekNext(zipper);
+                const prevNodeResult = zip.peekPrevious(zipper);
+                const nextNodeResult = zip.peekNext(zipper);
                 const prevNode = prevNodeResult.success ? prevNodeResult.item : null;
                 const nextNode = nextNodeResult.success ? nextNodeResult.item : null;
                 let space: FMTNode;
@@ -336,7 +326,7 @@ export class Formatter {
             }
 
 
-            const next = goNext(zipper);
+            const next = zip.goNext(zipper);
 
             // check for break;
             if (!next.success) {
