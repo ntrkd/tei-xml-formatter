@@ -1,19 +1,48 @@
 {
-	"compilerOptions": {
-		"module": "Node16",
-		"target": "ES2022",
-		"lib": [
-			"ES2022"
-		],
-		"sourceMap": true,
-		"rootDir": "src",
-		"strict": true,   /* enable all strict type-checking options */
-		/* Additional Checks */
-		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
-		// "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
-		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
-	},
-	"references": [
-		{ "path": "packages/texfmt/tsconfig.json" }
-	],
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    // File Layout
+    "rootDir": "./src",
+    "outDir": "./dist/esm",
+
+    // Environment Settings
+    // See also https://aka.ms/tsconfig/module
+    "module": "esnext",
+    "target": "esnext",
+    "types": [],
+    // For nodejs:
+    // "lib": ["esnext"],
+    // "types": ["node"],
+    // and npm install -D @types/node
+
+    // Other Outputs
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Stricter Typechecking Options
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Style Options
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    // Recommended Options
+    "strict": true,
+    "jsx": "react-jsx",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+
+    "composite": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler"
+  }
 }

@@ -1,54 +1,52 @@
 {
-  "name": "tei-xml-fmt",
-  "displayName": "tei-xml-fmt",
-  "description": "format tei xml documents",
-  "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.107.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onLanguage:xml"
-  ],
-  "main": "./dist/extension.js",
-  "contributes": {
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run package",
-    "build:workspaces": "npm run build --workspaces",
-    "compile": "npm run build:workspaces && npm run check-types && npm run lint && node esbuild.js",
-    "watch": "npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run build:workspaces && run check-types && npm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vscode-test"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.107.0",
-    "@typescript-eslint/eslint-plugin": "^8.42.0",
-    "@typescript-eslint/parser": "^8.42.0",
-    "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.25.9",
-    "eslint": "^9.34.0",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "he": "^1.2.0",
-    "saxes": "^6.0.0",
-    "texfmt": "file:./packages/texfmt"
-  },
-  "workspaces": [
-    "packages/*"
-  ]
+	"name": "tei-xml-fmt",
+	"version": "1.0.0",
+	"description": "format tei-xml documents",
+	"main": "./dist/cjs/index.js",
+	"module": "./dist/esm/index.js",
+	"types": "./dist/types/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		"./package.json": "./package.json",
+		".": {
+			"types": "./dist/types/index.d.ts",
+			"require": "./dist/cjs/index.js",
+			"import": "./dist/esm/index.js"
+		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ntrkd/tei-xml-formatter.git"
+	},
+	"keywords": [
+		"tei-xml",
+		"formatter",
+		"language",
+		"typescript",
+		"ts"
+	],
+	"author": "ntrkd",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/ntrkd/tei-xml-formatter/issues"
+	},
+	"homepage": "https://github.com/ntrkd/tei-xml-formatter#readme",
+	"scripts": {
+		"start": "tsc --watch",
+		"build": "tsc && tsc-alias -p tsconfig.json",
+		"postbuild": "esm2cjs --in ./dist/esm --out ./dist/cjs -l error",
+		"lint": "biome lint --write",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"devDependencies": {
+		"@alcalzone/esm2cjs": "^1.1.2",
+		"@biomejs/biome": "^2.4.9",
+		"tsc-alias": "^1.8.8",
+		"typescript": "^5.2.2"
+	},
+	"dependencies": {
+		"saxes": "^6.0.0"
+	}
 }
