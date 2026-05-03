@@ -1,25 +1,15 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast';
-import type { ParentNode, ASTNode } from './ast';
-import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt';
-import type { FMTNode } from "./fmt";
-import {
-	ContextVariant,
-	goNext,
-	peekNext,
-	goPrevious,
-	peekPrevious,
-	insertLeft,
-	insertRight,
-	goTop,
-	ZipperError,
-} from './zipper';
+import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import type { ParentNode, ASTNode } from './ast.js';
+import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
+import type { FMTNode } from "./fmt.js";
+import * as zip from './zipper.js';
 import type {
 	Zipper,
 	ZipperAdapter,
 	ZipperResult,
 	PeekResult,
-} from './zipper';
+} from './zipper.js';
 
 export enum FormatterErrorCode {
     ParserError = 'ParserError',
@@ -55,10 +45,22 @@ export class Formatter {
         }
     }
 
+    /**
+     * Make a Zipper from a tree node
+     * @param tree Tree to construct Zipper around
+     * @returns Traversable Zipper object
+     */
     private makeZipper(tree: ASTNode): Zipper<ASTNode> {
+        // Adapter function allows the Zipper which is generic to do actions which are specific to the ASTNode types
         const adapter: ZipperAdapter<ASTNode> = {
-            isLeaf: (node): node is ASTNode => !isParentNode(node),
+            isLeaf: (node): node is ASTNode => !isParentNode(node), // no child means leaf
             getChildren: (node): ASTNode[] => (isParentNode(node) ? node.children : []),
+            /**
+             * Function to make a new node from a node and children variable
+             * @param node Node to attach children to
+             * @param children Children to attach
+             * @returns An ASTNode node with the children attached
+             */
             makeNode: (node, children): ASTNode => {
                 if (isParentNode(node)) {
                     node.children = children;
@@ -70,7 +72,7 @@ export class Formatter {
 
         return {
             focus: tree,
-            context: { kind: ContextVariant.ROOT },
+            context: { kind: zip.ContextVariant.ROOT },
             adapter,
         };
     }
@@ -292,8 +294,8 @@ export class Formatter {
                 stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
                 // handled per 3b. in the algorithm spec
-                const prevNodeResult = peekPrevious(zipper);
-                const nextNodeResult = peekNext(zipper);
+                const prevNodeResult = zip.peekPrevious(zipper);
+                const nextNodeResult = zip.peekNext(zipper);
                 const prevNode = prevNodeResult.success ? prevNodeResult.item : null;
                 const nextNode = nextNodeResult.success ? nextNodeResult.item : null;
                 let space: FMTNode;
@@ -324,7 +326,7 @@ export class Formatter {
             }
 
 
-            const next = goNext(zipper);
+            const next = zip.goNext(zipper);
 
             // check for break;
             if (!next.success) {
