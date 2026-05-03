@@ -55,10 +55,22 @@ export class Formatter {
         }
     }
 
+    /**
+     * Make a Zipper from a tree node
+     * @param tree Tree to construct Zipper around
+     * @returns Traversable Zipper object
+     */
     private makeZipper(tree: ASTNode): Zipper<ASTNode> {
+        // Adapter function allows the Zipper which is generic to do actions which are specific to the ASTNode types
         const adapter: ZipperAdapter<ASTNode> = {
-            isLeaf: (node): node is ASTNode => !isParentNode(node),
+            isLeaf: (node): node is ASTNode => !isParentNode(node), // no child means leaf
             getChildren: (node): ASTNode[] => (isParentNode(node) ? node.children : []),
+            /**
+             * Function to make a new node from a node and children variable
+             * @param node Node to attach children to
+             * @param children Children to attach
+             * @returns An ASTNode node with the children attached
+             */
             makeNode: (node, children): ASTNode => {
                 if (isParentNode(node)) {
                     node.children = children;
