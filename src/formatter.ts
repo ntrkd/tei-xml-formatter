@@ -1,8 +1,8 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast';
-import type { ParentNode, ASTNode } from './ast';
-import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt';
-import type { FMTNode } from "./fmt";
+import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import type { ParentNode, ASTNode } from './ast.js';
+import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
+import type { FMTNode } from "./fmt.js";
 import {
 	ContextVariant,
 	goNext,
@@ -13,13 +13,13 @@ import {
 	insertRight,
 	goTop,
 	ZipperError,
-} from './zipper';
+} from './zipper.js';
 import type {
 	Zipper,
 	ZipperAdapter,
 	ZipperResult,
 	PeekResult,
-} from './zipper';
+} from './zipper.js';
 
 export enum FormatterErrorCode {
     ParserError = 'ParserError',
