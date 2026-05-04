@@ -190,7 +190,7 @@ function insertLeft<Item>(zipper: Zipper<Item>, node: Item): ZipperResult<Item> 
 		};
 	}
 
-    const { parent, parent_context, left_siblings, right_siblings } = ctx;
+    const left_siblings = ctx.left_siblings;
     const new_left_siblings = [...left_siblings, node];
 
 	return {
@@ -217,7 +217,7 @@ function insertRight<Item>(zipper: Zipper<Item>, node: Item): ZipperResult<Item>
 		};
 	}
 
-    const { parent, parent_context, left_siblings, right_siblings } = ctx;
+    const right_siblings = ctx.right_siblings;
     const new_right_siblings = [node, ...right_siblings];
 
 	return {
