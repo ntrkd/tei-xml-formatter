@@ -392,9 +392,7 @@ export class Formatter {
      * @returns AST with spaces propogated
      */
     private propogateSpaces(tree: ASTNode): ASTNode {
-        const origin = this.makeZipper(tree);
-
-        let current = origin;
+        let current = this.makeZipper(tree);
         // We only break once we hit the end of the document
         while (true) {
             const currentNode = current.focus;
@@ -510,7 +508,7 @@ export class Formatter {
         const tryTop = zip.goTop(current);
         if (!tryTop.success) {
             console.warn("An unexpected state occured when trying to go to the top of the Zipper");
-            return origin.focus;
+            return tree;
         }
         
         return tryTop.zipper.focus;
