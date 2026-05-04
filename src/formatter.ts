@@ -1,25 +1,15 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast';
-import type { ParentNode, ASTNode } from './ast';
-import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt';
-import type { FMTNode } from "./fmt";
-import {
-	ContextVariant,
-	goNext,
-	peekNext,
-	goPrevious,
-	peekPrevious,
-	insertLeft,
-	insertRight,
-	goTop,
-	ZipperError,
-} from './zipper';
+import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import type { ParentNode, ASTNode } from './ast.js';
+import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
+import type { FMTNode } from "./fmt.js";
+import * as zip from './zipper.js';
 import type {
 	Zipper,
 	ZipperAdapter,
 	ZipperResult,
 	PeekResult,
-} from './zipper';
+} from './zipper.js';
 
 export enum FormatterErrorCode {
     ParserError = 'ParserError',
@@ -55,10 +45,22 @@ export class Formatter {
         }
     }
 
+    /**
+     * Make a Zipper from a tree node
+     * @param tree Tree to construct Zipper around
+     * @returns Traversable Zipper object
+     */
     private makeZipper(tree: ASTNode): Zipper<ASTNode> {
+        // Adapter function allows the Zipper which is generic to do actions which are specific to the ASTNode types
         const adapter: ZipperAdapter<ASTNode> = {
-            isLeaf: (node): node is ASTNode => !isParentNode(node),
+            isLeaf: (node): node is ASTNode => !isParentNode(node), // no child means leaf
             getChildren: (node): ASTNode[] => (isParentNode(node) ? node.children : []),
+            /**
+             * Function to make a new node from a node and children variable
+             * @param node Node to attach children to
+             * @param children Children to attach
+             * @returns An ASTNode node with the children attached
+             */
             makeNode: (node, children): ASTNode => {
                 if (isParentNode(node)) {
                     node.children = children;
@@ -70,7 +72,7 @@ export class Formatter {
 
         return {
             focus: tree,
-            context: { kind: ContextVariant.ROOT },
+            context: { kind: zip.ContextVariant.ROOT },
             adapter,
         };
     }
@@ -292,8 +294,8 @@ export class Formatter {
                 stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
                 // handled per 3b. in the algorithm spec
-                const prevNodeResult = peekPrevious(zipper);
-                const nextNodeResult = peekNext(zipper);
+                const prevNodeResult = zip.peekPrevious(zipper);
+                const nextNodeResult = zip.peekNext(zipper);
                 const prevNode = prevNodeResult.success ? prevNodeResult.item : null;
                 const nextNode = nextNodeResult.success ? nextNodeResult.item : null;
                 let space: FMTNode;
@@ -324,7 +326,7 @@ export class Formatter {
             }
 
 
-            const next = goNext(zipper);
+            const next = zip.goNext(zipper);
 
             // check for break;
             if (!next.success) {
@@ -390,113 +392,126 @@ export class Formatter {
      * @returns AST with spaces propogated
      */
     private propogateSpaces(tree: ASTNode): ASTNode {
-        let current: Zipper<ASTNode> = this.makeZipper(tree);
-
-        // For loop keep going next() until we hit the end
+        let current = this.makeZipper(tree);
+        // We only break once we hit the end of the document
         while (true) {
-            const next = goNext(current);
-            if (next.success) {
-                current = next.zipper;
-            } else if (next.code === ZipperError.AT_END) {
-                break;
-            } else {
-                throw new FormatterError(FormatterErrorCode.UnexpectedZipperState, `Unexpected zipper state while propagating spaces: ${next.code}`);
-            }
-
-            // check if we are at SpacingNode
-            const currNode = current.focus;
-            if (currNode instanceof SpacingNode) {
-                // if Spacing Node has propogateLeft as false
-                if (!currNode.propogateLeft) {
+            const currentNode = current.focus;
+            if (currentNode instanceof SpacingNode) {
+                // Avoid infinite propogation by only propogating spaces that have not been propogated before
+                if (!currentNode.propogateLeft) {
+                    let leftPropogation: Zipper<ASTNode> = current;
+                    // Break manually when we hit a node we cannot carry over
                     while (true) {
-                        const goPrev = goPrevious(current);
-                        if (goPrev.success) {
-                            current = goPrev.zipper;
+                        let tryPrev = zip.goPrevious(leftPropogation);
+                        if (tryPrev.success) {
+                            leftPropogation = tryPrev.zipper;
                         } else {
-                            break; // Reached the beginning, nothing to do
+                            // We have reached the beginning
+                            break;
                         }
 
-                        if (current.focus instanceof TagNode) {
-                            // insert spacing node into left sibling tail
-                            const peekPrevResult = peekPrevious(current);
-                            if (!peekPrevResult.success || !(peekPrevResult.item instanceof SpacingNode)) {
-                                let parentVal: ASTNode | null = null;
-                                if (current.context.kind === ContextVariant.CHILD && isParentNode(current.context.parent)) {
-                                    parentVal = current.context.parent;
+                        if (leftPropogation.focus instanceof TagNode) {
+                            // if no space node to left, insert space node then goPrevious
+
+                            const peekPrev = zip.peekPrevious(leftPropogation);
+                            // previous node must not be SpacingNode
+                            if (peekPrev.success && !(peekPrev.item instanceof SpacingNode) || !peekPrev.success) {
+                                let spaceLeftInsert = zip.insertLeft(leftPropogation, new SpacingNode(leftPropogation.focus.parent, true, true));
+                                if (!spaceLeftInsert.success) {
+                                    console.warn("Tried to insert a space at the root node");
+                                    break;
                                 }
 
-                                const insertResult = insertLeft(current, new SpacingNode(parentVal, true, true));
-                                if (!insertResult.success) {
-                                    throw new FormatterError(FormatterErrorCode.UnexpectedZipperState, `Failed to insert spacing left: ${insertResult.code}`);
+                                let oneNodeBack = zip.goPrevious(spaceLeftInsert.zipper);
+                                if (!oneNodeBack.success) {
+                                    console.warn("Impossible state");
+                                    break;
                                 }
-                                current = insertResult.zipper;
 
-                                const goPrev2 = goPrevious(current);
-                                if (goPrev2.success) {
-                                    current = goPrev2.zipper;
-                                } else {
-                                    break; // Reached the beginning, nothing to do
-                                }
+                                leftPropogation = oneNodeBack.zipper;
+                                continue;
+                            } else {
+                                currentNode.propogateLeft = true;
+                                break; // Cannot carry space so break
                             }
                         } else {
-                            currNode.propogateLeft = true;
+                            currentNode.propogateLeft = true;
                             break;
                         }
                     }
-                } else if (!currNode.propogateRight) {
+
+                    current = leftPropogation;
+                } else if (!currentNode.propogateRight) {
+                    let rightPropogation: Zipper<ASTNode> = current;
+                    // break manually when we hit a node we cannot carry over
                     while (true) {
-                        const goNextRes = goNext(current);
-                        if (goNextRes.success) {
-                            current = goNextRes.zipper;
+                        let tryNext = zip.goNext(rightPropogation);
+                        if (tryNext.success) {
+                            rightPropogation = tryNext.zipper;
                         } else {
-                            break; // Reached the end
-                        }
-
-                        if (current.focus instanceof CloseTagNode) {
-                            // insert SpaceNode to the right
-                            const peekNextResult = peekNext(current);
-                            if (!peekNextResult.success || !(peekNextResult.item instanceof SpacingNode)) {
-                                let parentVal: ParentNode | null = null;
-                                if (current.context.kind === ContextVariant.CHILD && isParentNode(current.context.parent)) {
-                                    parentVal = current.context.parent;
-                                }
-
-                                if (current.context.kind === ContextVariant.CHILD && current.context.parent_context.kind === ContextVariant.CHILD) {
-                                    current.context.parent_context.right_siblings.unshift(new SpacingNode(parentVal, true, true));
-                                } else {
-                                    const insertRightResult = insertRight(current, new SpacingNode(parentVal, true, true));
-                                    if (!insertRightResult.success) {
-                                        throw new FormatterError(FormatterErrorCode.UnexpectedZipperState, `Failed to insert spacing right: ${insertRightResult.code}`);
-                                    }
-                                    current = insertRightResult.zipper;
-                                }
-                            }
-
-                            const goNext2 = goNext(current);
-                            if (goNext2.success) {
-                                current = goNext2.zipper;
-                            } else {
-                                // We just inserted an node in front, should never trigger
-                                throw new FormatterError(FormatterErrorCode.UnexpectedZipperState, `Unexpected zipper state while propagating spaces: ${goNext2.code}`);
-                            }
-                        } else {
-                            currNode.propogateRight = true;
+                            // We have reached the end
                             break;
                         }
+
+                        if (rightPropogation.focus instanceof CloseTagNode) {
+                            // if no space node to right, insert space node then goNext
+
+                            const peekNext = zip.peekNext(rightPropogation);
+                            // next node must not be SpacingNode
+                            if (peekNext.success && !(peekNext.item instanceof SpacingNode) || !peekNext.success) {
+                                let spaceRightInsert = zip.insertRight(rightPropogation, new SpacingNode(rightPropogation.focus.parent, true, true));
+                                if (!spaceRightInsert.success) {
+                                    console.warn("Tried to insert a space at the root node");
+                                    break;
+                                }
+
+                                let oneNodeForward = zip.goNext(spaceRightInsert.zipper);
+                                if (!oneNodeForward.success) {
+                                    console.warn("Impossible state");
+                                    break;
+                                }
+
+                                rightPropogation = oneNodeForward.zipper;
+                                continue;
+                            } else {
+                                currentNode.propogateRight = true;
+                                break; // Cannot carry space so break
+                            }
+                        } else {
+                            currentNode.propogateRight = true;
+                            break;
+                        }
+                    }
+
+                    current = rightPropogation;
+                } else {
+                    const goNext = zip.goNext(current);
+                    if (goNext.success) {
+                        current = goNext.zipper;
+                    } else {
+                        // We reached the end
+                        break;
                     }
                 }
-
+            } else {
+                const goNext = zip.goNext(current);
+                if (goNext.success) {
+                    current = goNext.zipper;
+                } else {
+                    // We reached the end
+                    break;
+                }
             }
         }
-        
-        // once all the looping is done, all spaces should be propogated
 
-        const goTopResult = goTop(current);
-        if (goTopResult.success) {
-            return goTopResult.zipper.focus;
-        } else {
-            throw new FormatterError(FormatterErrorCode.ZipperGoTopFailed, 'Could not rewind to root after space propagation');
+        // Go top
+        const tryTop = zip.goTop(current);
+        if (!tryTop.success) {
+            console.warn("An unexpected state occured when trying to go to the top of the Zipper");
+            return tree;
         }
+        
+        return tryTop.zipper.focus;
     }
 
     /**
