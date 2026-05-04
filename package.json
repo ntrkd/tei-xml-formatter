@@ -1,6 +1,6 @@
 {
 	"name": "tei-xml-fmt",
-	"version": "1.0.2",
+	"version": "1.0.4",
 	"type": "module",
 	"description": "format tei-xml documents",
 	"main": "./dist/cjs/index.js",
