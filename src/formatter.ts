@@ -403,11 +403,11 @@ export class Formatter {
                     // Break manually when we hit a node we cannot carry over
                     while (true) {
                         let tryPrev = zip.goPrevious(leftPropogation);
-                        // We have reached the beginning
-                        if (!tryPrev.success) {
-                            break;
-                        } else {
+                        if (tryPrev.success) {
                             leftPropogation = tryPrev.zipper;
+                        } else {
+                            // We have reached the beginning
+                            break;
                         }
 
                         if (leftPropogation.focus instanceof TagNode) {
@@ -446,11 +446,11 @@ export class Formatter {
                     // break manually when we hit a node we cannot carry over
                     while (true) {
                         let tryNext = zip.goNext(rightPropogation);
-                        // We have reached the end
-                        if (!tryNext.success) {
-                            break;
-                        } else {
+                        if (tryNext.success) {
                             rightPropogation = tryNext.zipper;
+                        } else {
+                            // We have reached the end
+                            break;
                         }
 
                         if (rightPropogation.focus instanceof CloseTagNode) {
