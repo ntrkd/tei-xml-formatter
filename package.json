@@ -39,7 +39,7 @@
 		"build": "tsc && tsc-alias -p tsconfig.json",
 		"postbuild": "esm2cjs --in ./dist/esm --out ./dist/cjs -l error",
 		"lint": "biome lint --write",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "npm run build && node --test tests/*.test.mjs"
 	},
 	"devDependencies": {
 		"@alcalzone/esm2cjs": "^1.1.2",
