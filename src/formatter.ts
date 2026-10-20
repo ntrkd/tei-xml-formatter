@@ -181,8 +181,15 @@ export class Formatter {
 
         this.saxes.write(doc).close();
 
+        // Drop whitespace outside the root element first so it can't block spaces carried out of the root
+        this.trimLeadingSpacing(xmlDoc);
+        this.trimTrailingSpacing(xmlDoc);
+
         const propogateSpaces = this.propogateSpaces(xmlDoc);
         this.markFirstLastSpacingInTags(propogateSpaces);
+        // Trim spaces carried to the ends after marking so they still count when pairing up First/Last spacing for indentation
+        this.trimLeadingSpacing(propogateSpaces);
+        this.trimTrailingSpacing(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
         const formattedFile = this.renderNode(fmtTree, false, 0);
 
@@ -341,6 +348,42 @@ export class Formatter {
     }
 
     /**
+     * Remove SpacingNodes that come before any content in the document (e.g. whitespace before the root element)
+     * @param node Node to process (the DocumentNode)
+     */
+    private trimLeadingSpacing(node: ASTNode): void {
+        if (!isParentNode(node)) {
+            return;
+        }
+
+        // A TagNode renders its own open tag before its children, so only the top level can have leading spaces
+        while (node.children[0] instanceof SpacingNode) {
+            node.children.shift();
+        }
+    }
+
+    /**
+     * Recursively remove SpacingNodes that come after all content in the document
+     * (e.g. a trailing newline after the root element, or a space propogated past the root close tag)
+     * @param node Node to process (the DocumentNode)
+     */
+    private trimTrailingSpacing(node: ASTNode): void {
+        if (!isParentNode(node)) {
+            return;
+        }
+
+        while (node.children[node.children.length - 1] instanceof SpacingNode) {
+            node.children.pop();
+        }
+
+        // Propogated spaces can be inserted after a CloseTagNode, so look inside the last child as well
+        const lastChild: ASTNode | undefined = node.children[node.children.length - 1];
+        if (lastChild !== undefined) {
+            this.trimTrailingSpacing(lastChild);
+        }
+    }
+
+    /**
      * Helper function to recursively mark the first and last spacing (and whether they are alone) within TagNode
      * @param node Node to process
      */
@@ -406,7 +449,8 @@ export class Formatter {
                         if (tryPrev.success) {
                             leftPropogation = tryPrev.zipper;
                         } else {
-                            // We have reached the beginning
+                            // We have reached the beginning, mark as propogated so we don't revisit this forever
+                            currentNode.propogateLeft = true;
                             break;
                         }
 
@@ -449,7 +493,8 @@ export class Formatter {
                         if (tryNext.success) {
                             rightPropogation = tryNext.zipper;
                         } else {
-                            // We have reached the end
+                            // We have reached the end, mark as propogated so we don't revisit this forever
+                            currentNode.propogateRight = true;
                             break;
                         }
 
