@@ -38,3 +38,35 @@ test('throws FormatterError with parser code for invalid XML', () => {
 		(error) => error instanceof FormatterError && error.code === FormatterErrorCode.ParserError,
 	);
 });
+
+// tests for https://github.com/ntrkd/tei-xml-formatter/issues/9
+test('returns and drops trailing whitespace after the root element', () => {
+	for (const trailing of ['\n', ' ', '\r\n', '\n\n\t ']) {
+		const formatted = new Formatter().format(`<TEI><p>x</p></TEI>${trailing}`);
+
+		assert.equal(formatted, '<TEI><p>x</p></TEI>');
+	}
+});
+
+test('does not propogate a space past the root close tag', () => {
+	const formatted = new Formatter().format('<TEI><p>x</p> </TEI>\n');
+
+	assert.equal(formatted, '<TEI><p>x</p> </TEI>');
+});
+
+test('keeps the space between the XML declaration and the root element', () => {
+	const formatted = new Formatter().format('<?xml version="1.0"?>\n<TEI><p>x</p></TEI>\n');
+
+	assert.equal(formatted, '<?xml version="1.0"?> <TEI><p>x</p></TEI>');
+});
+
+test('trailing whitespace does not change the formatting of a wrapped document', () => {
+	const doc = '<?xml version="1.0" encoding="UTF-8"?>\n<TEI xmlns="http://www.tei-c.org/ns/1.0">\n<text><body><div type="letter">\n<head>Letter from Emily to John</head> <p> <hi rend="italic">Dear John,</hi><lb/> I hope this letter finds you well.\nThe weather here has been <hi rend="bold">unusually warm</hi> for October.\n</p></div></body></text></TEI>';
+	const expected = new Formatter().format(doc);
+
+	assert.match(expected, /\n\t<text>/);
+	for (const trailing of ['\n', '\r\n']) {
+		assert.equal(new Formatter().format(doc + trailing), expected);
+	}
+});
+// tests for https://github.com/ntrkd/tei-xml-formatter/issues/9
