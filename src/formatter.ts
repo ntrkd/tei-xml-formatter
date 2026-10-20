@@ -499,18 +499,24 @@ export class Formatter {
                         }
 
                         if (rightPropogation.focus instanceof CloseTagNode) {
-                            // if no space node to right, insert space node then goNext
+                            // if no space node to right of the closed TagNode, insert space node after it then goRight
+                            // The CloseTagNode is the last child of its TagNode, so the space must be inserted on the TagNode itself
+                            const parentTag = zip.goUp(rightPropogation);
+                            if (!parentTag.success) {
+                                console.warn("CloseTagNode has no parent TagNode");
+                                break;
+                            }
 
-                            const peekNext = zip.peekNext(rightPropogation);
+                            const nextSibling = zip.goRight(parentTag.zipper);
                             // next node must not be SpacingNode
-                            if (peekNext.success && !(peekNext.item instanceof SpacingNode) || !peekNext.success) {
-                                let spaceRightInsert = zip.insertRight(rightPropogation, new SpacingNode(rightPropogation.focus.parent, true, true));
+                            if (nextSibling.success && !(nextSibling.zipper.focus instanceof SpacingNode) || !nextSibling.success) {
+                                let spaceRightInsert = zip.insertRight(parentTag.zipper, new SpacingNode(parentTag.zipper.focus.parent, true, true));
                                 if (!spaceRightInsert.success) {
                                     console.warn("Tried to insert a space at the root node");
                                     break;
                                 }
 
-                                let oneNodeForward = zip.goNext(spaceRightInsert.zipper);
+                                let oneNodeForward = zip.goRight(spaceRightInsert.zipper);
                                 if (!oneNodeForward.success) {
                                     console.warn("Impossible state");
                                     break;
