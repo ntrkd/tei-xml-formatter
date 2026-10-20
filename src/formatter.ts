@@ -181,15 +181,11 @@ export class Formatter {
 
         this.saxes.write(doc).close();
 
-        // Drop whitespace outside the root element first so it can't block spaces carried out of the root
-        this.trimLeadingSpacing(xmlDoc);
-        this.trimTrailingSpacing(xmlDoc);
-
         const propogateSpaces = this.propogateSpaces(xmlDoc);
-        this.markFirstLastSpacingInTags(propogateSpaces);
-        // Trim spaces carried to the ends after marking so they still count when pairing up First/Last spacing for indentation
+        // Whitespace outside the root element and spaces carried past it are direct children of the DocumentNode
         this.trimLeadingSpacing(propogateSpaces);
         this.trimTrailingSpacing(propogateSpaces);
+        this.markFirstLastSpacingInTags(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
         const formattedFile = this.renderNode(fmtTree, false, 0);
 
@@ -348,7 +344,8 @@ export class Formatter {
     }
 
     /**
-     * Remove SpacingNodes that come before any content in the document (e.g. whitespace before the root element)
+     * Remove SpacingNodes that come before any content in the document
+     * (e.g. whitespace before the root element, or a space propogated past the root open tag)
      * @param node Node to process (the DocumentNode)
      */
     private trimLeadingSpacing(node: ASTNode): void {
@@ -363,7 +360,7 @@ export class Formatter {
     }
 
     /**
-     * Recursively remove SpacingNodes that come after all content in the document
+     * Remove SpacingNodes that come after all content in the document
      * (e.g. a trailing newline after the root element, or a space propogated past the root close tag)
      * @param node Node to process (the DocumentNode)
      */
@@ -372,14 +369,9 @@ export class Formatter {
             return;
         }
 
+        // A TagNode always ends with its CloseTagNode, so only the top level can have trailing spaces
         while (node.children[node.children.length - 1] instanceof SpacingNode) {
             node.children.pop();
-        }
-
-        // Propogated spaces can be inserted after a CloseTagNode, so look inside the last child as well
-        const lastChild: ASTNode | undefined = node.children[node.children.length - 1];
-        if (lastChild !== undefined) {
-            this.trimTrailingSpacing(lastChild);
         }
     }
 
