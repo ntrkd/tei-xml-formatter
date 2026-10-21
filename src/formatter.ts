@@ -25,6 +25,12 @@ const PLACEHOLDER_FIRST = 0xE000;
 const PLACEHOLDER_LAST = 0xF8FF;
 const PLACEHOLDER_PATTERN = /[-]/g;
 
+const MAX_WDITH = 80;
+const INDENT_UNIT = '\t';
+const NEWLINE = '\n';
+// Self-closing tags that end their line when there is a space next to them
+const LINE_END_TAGS = ['lb'];
+
 export class FormatterError extends Error {
     public readonly code: FormatterErrorCode;
     public declare readonly cause?: Error;
@@ -42,6 +48,7 @@ export class Formatter {
     private saxes: SaxesParser;
     // Placeholder character -> the reference it replaced, as written in the source
     private references = new Map<string, string>();
+    private lineEndTags = new Set(LINE_END_TAGS);
 
     constructor() {
         this.saxes = new SaxesParser();
@@ -270,7 +277,7 @@ export class Formatter {
         this.trimLeadingSpacing(propogateSpaces);
         this.trimTrailingSpacing(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
-        const formattedFile = this.renderNode(fmtTree, 0);
+        const formattedFile = this.renderNode(fmtTree, 0, 0);
 
         return formattedFile[0];
     }
@@ -279,13 +286,10 @@ export class Formatter {
      * Recursively render a node by rendering all its children
      * @param node The node to render
      * @param indentLevel Indent level of the line the node starts on (set 0 for root node)
+     * @param column Column the node starts at, each tab counts as one column like width() (set 0 for root node)
      * @returns [rendered string, indent level of the line the node ends on]
      */
-    private renderNode(node: FMTNode, indentLevel: number): [string, number] {
-        const MAX_WDITH = 80;
-        const INDENT_UNIT = '\t';
-        const NEWLINE = '\n';
-
+    private renderNode(node: FMTNode, indentLevel: number, column: number): [string, number] {
         if (node instanceof Text) {
             return [node.text, indentLevel];
         }
@@ -293,9 +297,12 @@ export class Formatter {
         if (node instanceof SpaceOrLine) {
             return [' ', indentLevel];
         }
+        if (node.flow) {
+            return this.renderFlow(node, indentLevel, column);
+        }
 
-        // A group that fits never has a child that wraps, children are never wider than their parent
-        const wrap = node.width() > MAX_WDITH;
+        // A group that fits never has a child that wraps, children render on the same line and are never wider than their parent
+        const wrap = column + node.width() > MAX_WDITH;
         // Indentation follows nesting: lines go one level deeper than the line the group starts on,
         // and the line before the close tag goes back to it
         const groupIndent = indentLevel;
@@ -303,17 +310,136 @@ export class Formatter {
         let output = '';
 
         for (const child of node.nodes) {
-            if (child instanceof SpaceOrLine && wrap) {
+            if (child instanceof SpaceOrLine && (wrap || child.forced)) {
                 indentLevel = child.beforeClose ? groupIndent : childIndent;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+                column = indentLevel;
             } else {
-                const [text, endIndentLevel] = this.renderNode(child, indentLevel);
+                const [text, endIndentLevel] = this.renderNode(child, indentLevel, column);
                 output += text;
                 indentLevel = endIndentLevel;
+                column = this.endColumn(text, column);
             }
         }
 
         return [output, indentLevel];
+    }
+
+    /**
+     * Column after rendering text, each tab counts as one column like width()
+     * @param text Rendered text
+     * @param column Column the text starts at
+     */
+    private endColumn(text: string, column: number): number {
+        const lastNewLine = text.lastIndexOf(NEWLINE);
+        return lastNewLine === -1 ? column + text.length : text.length - lastNewLine - 1;
+    }
+
+    /**
+     * Render a group whose content flows like text. The groups inside it are flattened into one run of text,
+     * which breaks onto a new line wherever the content up to the next line would not fit.
+     * The lines right after the open tag and right before the close tag of the group break only if the group wraps
+     * @param group The flowing group to render
+     * @param indentLevel Indent level of the line the group starts on
+     * @param column Column the group starts at
+     * @returns [rendered string, indent level of the line the group ends on]
+     */
+    private renderFlow(group: Group, indentLevel: number, column: number): [string, number] {
+        const wrap = column + group.width() > MAX_WDITH;
+        const groupIndent = indentLevel;
+        const childIndent = group.indent ? groupIndent + 1 : groupIndent;
+        const afterOpen = group.nodes[1];
+        const beforeClose = group.nodes[group.nodes.length - 2];
+        const items = this.flatten(group);
+        let output = '';
+
+        items.forEach((item, i) => {
+            if (item instanceof Text) {
+                output += item.text;
+                column = this.endColumn(item.text, column);
+                return;
+            }
+
+            let newLine: boolean;
+            if (item.forced) {
+                newLine = true;
+            } else if (item === afterOpen || item === beforeClose) {
+                newLine = wrap;
+            } else {
+                newLine = column + item.width() + this.widthToNextLine(items, i + 1) > MAX_WDITH;
+            }
+
+            if (newLine) {
+                indentLevel = item === beforeClose ? groupIndent : childIndent;
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+                column = indentLevel;
+            } else {
+                output += ' ';
+                column += item.width();
+            }
+        });
+
+        return [output, indentLevel];
+    }
+
+    /**
+     * Flatten a formatting tree into its text and lines, in order
+     * @param node Node to flatten
+     */
+    private flatten(node: FMTNode): (Text | SpaceOrLine)[] {
+        return node instanceof Group ? node.nodes.flatMap((child) => this.flatten(child)) : [node];
+    }
+
+    /**
+     * Width of the text from an index up to the next line, which has to stay on one line
+     * @param items Flattened text and lines
+     * @param start Index to start from
+     */
+    private widthToNextLine(items: (Text | SpaceOrLine)[], start: number): number {
+        let width = 0;
+        for (let i = start; i < items.length; i++) {
+            const item = items[i];
+            if (item === undefined || item instanceof SpaceOrLine) {
+                break;
+            }
+            width += item.width();
+        }
+        return width;
+    }
+
+    /**
+     * Whether a tag has text directly inside it. Its content then flows like text, including the tags inside it
+     * @param node Tag to check
+     */
+    private hasDirectText(node: TagNode): boolean {
+        return node.children.some((child) => child instanceof TextNode);
+    }
+
+    /**
+     * Whether a node is a self-closing tag that ends its line
+     * @param node Node to check
+     */
+    private isLineEndTag(node: ASTNode): boolean {
+        return node instanceof TagNode && node.selfClosing && this.lineEndTags.has(node.name);
+    }
+
+    /**
+     * Whether a space has to become a new line so a line end tag (like <lb/>) ends its line.
+     * That is the space after the tag, or the space before it when it has none after it
+     * @param zipper Zipper focused on the SpacingNode
+     */
+    private isForcedLine(zipper: Zipper<ASTNode>): boolean {
+        const left = zip.goLeft(zipper);
+        if (left.success && this.isLineEndTag(left.zipper.focus)) {
+            return true;
+        }
+
+        const right = zip.goRight(zipper);
+        if (!right.success || !this.isLineEndTag(right.zipper.focus)) {
+            return false;
+        }
+        const afterTag = zip.goRight(right.zipper);
+        return !(afterTag.success && afterTag.zipper.focus instanceof SpacingNode);
     }
 
     /**
@@ -344,7 +470,7 @@ export class Formatter {
                 // needs a new group attached, stack increased, and tag node textualized and added to the new group
                 const attrStr = Object.entries(focus.attributes).map(([k, v]) => ` ${k}="${v}"`).join('');
                 const tagText = `<${focus.name}${attrStr}${focus.selfClosing ? ' /' : ''}>`;
-                const newGroup = new Group([new Text(tagText)]);
+                const newGroup = new Group([new Text(tagText)], true, stackTop.flow || this.hasDirectText(focus));
                 stackTop.nodes.push(newGroup);
                 if (!focus.selfClosing) {
                     fmtStack.push(newGroup);
@@ -355,8 +481,13 @@ export class Formatter {
                 stackTop.nodes.push(new Text(closeText));
                 fmtStack.pop();
             } else if (focus instanceof TextNode) {
-                // just add as a text node
-                stackTop.nodes.push(new Text(focus.text));
+                // Text only appears in flowing groups, where it can break between any two words
+                focus.text.split(' ').forEach((word, i) => {
+                    if (i > 0) {
+                        stackTop.nodes.push(new SpaceOrLine());
+                    }
+                    stackTop.nodes.push(new Text(word));
+                });
             } else if (focus instanceof CommentNode) {
                 // rendered verbatim like text
                 stackTop.nodes.push(new Text(`<!--${focus.text}-->`));
@@ -366,7 +497,7 @@ export class Formatter {
             } else if (focus instanceof SpacingNode) {
                 // handled per 5b. in the algorithm spec
                 const nextNode = zip.peekNext(zipper);
-                stackTop.nodes.push(new SpaceOrLine(nextNode.success && nextNode.item instanceof CloseTagNode));
+                stackTop.nodes.push(new SpaceOrLine(nextNode.success && nextNode.item instanceof CloseTagNode, this.isForcedLine(zipper)));
             }
 
 
