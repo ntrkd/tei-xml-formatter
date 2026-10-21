@@ -15,8 +15,6 @@ export enum FormatterErrorCode {
     FmtStackEmpty = 'FmtStackEmpty',
     ZipperGoTopFailed = 'ZipperGoTopFailed',
     UnexpectedZipperState = 'UnexpectedZipperState',
-    NegativeIndent = 'NegativeIndent',
-    UnbalancedIndent = 'UnbalancedIndent',
     PlaceholdersExhausted = 'PlaceholdersExhausted',
 }
 
