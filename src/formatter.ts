@@ -441,7 +441,8 @@ export class Formatter {
                             break;
                         }
 
-                        if (leftPropogation.focus instanceof TagNode) {
+                        // Self-closing tags (<lb/>, <pb/>, ...) mark a position in the text, a space carried before one changes the text
+                        if (leftPropogation.focus instanceof TagNode && !leftPropogation.focus.selfClosing) {
                             // if no space node to left, insert space node then goPrevious
 
                             const peekPrev = zip.peekPrevious(leftPropogation);

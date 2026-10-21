@@ -237,3 +237,35 @@ test('indents children of a tag that shares a line with its parent', () => {
 	);
 });
 // structural indentation tests
+
+// self-closing tag spacing tests
+test('does not carry a space before a self-closing tag', () => {
+	const cases = [
+		{ xml: '<p>Episco<lb break="no"/>\npal and Jackson-<lb/>\nville</p>', expected: '<p>Episco<lb break="no" /> pal and Jackson-<lb /> ville</p>' },
+		{ xml: '<p><lb/> text</p>', expected: '<p><lb /> text</p>' },
+		{ xml: '<p>a<pb n="2"/><lb/> b</p>', expected: '<p>a<pb n="2" /><lb /> b</p>' },
+		{ xml: '<div><p>x</p><milestone unit="section"/> <p>y</p></div>', expected: '<div><p>x</p><milestone unit="section" /> <p>y</p></div>' },
+	];
+
+	for (const { xml, expected } of cases) {
+		assert.equal(new Formatter().format(xml), expected);
+	}
+});
+
+test('keeps spaces around self-closing tags that were in the source', () => {
+	for (const xml of ['<p>a <lb/> b</p>', '<p>word <lb/>next</p>']) {
+		assert.equal(new Formatter().format(xml), xml.replace('<lb/>', '<lb />'));
+	}
+});
+
+test('keeps self-closing tags at the end of their line when wrapping', () => {
+	const formatted = new Formatter().format(
+		'<div>\n<p>Executive committee<lb/>\n<name>S. H. Berg</name>, President<lb/>\n<name>Louie Limbaugh</name>, Vice President<lb/>\nMrs. E. G. McFadden, Secretary</p>\n</div>',
+	);
+
+	assert.equal(
+		formatted,
+		'<div>\n\t<p>Executive committee<lb />\n\t\t<name>S. H. Berg</name>, President<lb />\n\t\t<name>Louie Limbaugh</name>, Vice President<lb />\n\t\tMrs. E. G. McFadden, Secretary</p>\n</div>',
+	);
+});
+// self-closing tag spacing tests
