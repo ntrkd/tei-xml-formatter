@@ -21,7 +21,7 @@ export enum FormatterErrorCode {
 
 export class FormatterError extends Error {
     public readonly code: FormatterErrorCode;
-    public override readonly cause?: Error;
+    public declare readonly cause?: Error;
 
     constructor(code: FormatterErrorCode, message: string, cause?: Error) {
         super(message, { cause });

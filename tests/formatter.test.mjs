@@ -40,6 +40,21 @@ test('throws FormatterError with parser code for invalid XML', () => {
 	);
 });
 
+test('keeps the parser error as the cause of a ParserError', () => {
+	assert.throws(
+		() => new Formatter().format('<p a="1"b="2"></p>'),
+		(error) => error instanceof FormatterError
+			&& error.cause instanceof Error
+			&& error.cause.message.includes('no whitespace between attributes'),
+	);
+});
+
+test('keeps the cause passed to the FormatterError constructor', () => {
+	const cause = new Error('inner');
+
+	assert.equal(new FormatterError(FormatterErrorCode.ParserError, 'outer', cause).cause, cause);
+});
+
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/9
 test('returns and drops trailing whitespace after the root element', () => {
 	for (const trailing of ['\n', ' ', '\r\n', '\n\n\t ']) {
