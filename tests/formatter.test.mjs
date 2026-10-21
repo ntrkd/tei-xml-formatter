@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Formatter, FormatterError, FormatterErrorCode } from '../dist/esm/index.js';
-import { Group, Line, LineDeindent, LineIndent, SpaceOrLine, Text } from '../dist/esm/fmt.js';
 
 test('formats simple inline XML without changing text content', () => {
 	const formatted = new Formatter().format('<p>Hello <hi>world</hi></p>');
@@ -125,42 +124,6 @@ test('indents comments as the first and last children of a wrapped tag', () => {
 	assert.equal(formatted, `<TEI>\n\t<!-- first -->\n\t<p>${long}</p>\n\t<!-- last -->\n</TEI>`);
 });
 
-test('throws NegativeIndent when spacing would deindent below level 0', () => {
-	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
-	const lastSpaceOrLine = new SpaceOrLine();
-	lastSpaceOrLine.significance = 'Last';
-	const lastLine = new Line();
-	lastLine.significance = 'Last';
-
-	for (const space of [lastSpaceOrLine, lastLine, new LineDeindent()]) {
-		const tree = new Group([new Text(`<p>${long}`), space, new Text('</p>')]);
-
-		assert.throws(
-			() => new Formatter()['renderNode'](tree, false, 0),
-			(error) => error instanceof FormatterError && error.code === FormatterErrorCode.NegativeIndent,
-		);
-	}
-});
-
-test('throws UnbalancedIndent when a group does not end at the indent level it started at', () => {
-	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
-	const cases = [
-		// indent with no matching deindent
-		{ space: new LineIndent(), indentLevel: 0 },
-		// deindent with no matching indent, nested deep enough that it never goes below 0
-		{ space: new LineDeindent(), indentLevel: 2 },
-	];
-
-	for (const { space, indentLevel } of cases) {
-		const tree = new Group([new Text(`<p>${long}`), space, new Text('</p>')]);
-
-		assert.throws(
-			() => new Formatter()['renderNode'](tree, false, indentLevel),
-			(error) => error instanceof FormatterError && error.code === FormatterErrorCode.UnbalancedIndent,
-		);
-	}
-});
-
 // xml entity handling tests
 test('keeps entity and character references in text as written', () => {
 	const cases = [
@@ -246,3 +209,31 @@ test('does not merge text into a processing instruction inside an element', () =
 	}
 });
 // processing instruction handling tests
+
+// structural indentation tests
+test('indents content by nesting depth when a tag only has a space after its open tag', () => {
+	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
+	const formatted = new Formatter().format(`<root><r> ${words}</r></root>`);
+
+	assert.equal(formatted, `<root>\n\t<r>\n\t\t${words}</r></root>`);
+});
+
+test('puts a close tag level with the line its tag opened on when only it has a space before it', () => {
+	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
+	const formatted = new Formatter().format(`<root><r>${words} </r></root>`);
+
+	assert.equal(formatted, `<root><r>${words}\n</r>\n</root>`);
+});
+
+test('indents children of a tag that shares a line with its parent', () => {
+	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
+	const formatted = new Formatter().format(
+		`<TEI><text><body>\n<div><p>${words}</p>\n<p>${words} fifteen</p></div>\n</body></text></TEI>`,
+	);
+
+	assert.equal(
+		formatted,
+		`<TEI>\n\t<text>\n\t\t<body>\n\t\t\t<div><p>${words}</p>\n\t\t\t\t<p>${words} fifteen</p></div>\n\t\t</body>\n\t</text>\n</TEI>`,
+	);
+});
+// structural indentation tests

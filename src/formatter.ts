@@ -1,7 +1,7 @@
 import { SaxesParser } from 'saxes';
 import { DocumentNode, TagNode, TextNode, CommentNode, ProcessingInstructionNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
 import type { ParentNode, ASTNode } from './ast.js';
-import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
+import { Group, Text, SpaceOrLine } from './fmt.js';
 import type { FMTNode } from "./fmt.js";
 import * as zip from './zipper.js';
 import type {
@@ -273,80 +273,48 @@ export class Formatter {
         this.trimTrailingSpacing(propogateSpaces);
         this.markFirstLastSpacingInTags(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
-        const formattedFile = this.renderNode(fmtTree, false, 0);
+        const formattedFile = this.renderNode(fmtTree, 0);
 
         return formattedFile[0];
     }
 
     /**
-     * Recursively render a node recursively by rendering all its children
+     * Recursively render a node by rendering all its children
      * @param node The node to render
-     * @param parentWrap Whether the node's parent was set to wrap (set false for root node)
-     * @param indentLevel The indent level the current node is already at (set 0 for root node)
-     * @returns [rendered string, indent level]
+     * @param indentLevel Indent level of the line the node starts on (set 0 for root node)
+     * @returns [rendered string, indent level of the line the node ends on]
      */
-    private renderNode(node: FMTNode, parentWrap: boolean, indentLevel: number): [string, number] {
+    private renderNode(node: FMTNode, indentLevel: number): [string, number] {
         const MAX_WDITH = 80;
         const INDENT_UNIT = '\t';
         const NEWLINE = '\n';
 
-        let output = '';
-        const nodeWrap: boolean = node.width() > MAX_WDITH;
-
-        // if the parent is wrapping then every new group gets its own newline
-        // if the parent decides to wrap, the child can decide to not wrap
-        // if the parent decides to not wrap, every child (recursive) MUST not wrap
-        if (node instanceof Group) {
-            const startIndentLevel = indentLevel;
-            // call render node on all children and add em up
-            for (const child of node.nodes) {
-                const renderChild = this.renderNode(child, nodeWrap, indentLevel);
-                output += renderChild[0];
-                indentLevel = renderChild[1];
-            } 
-            // every indent inside a group is paired with a deindent in the same group, so it must end where it started
-            this.assert(indentLevel === startIndentLevel, FormatterErrorCode.UnbalancedIndent, `Group started at indent level ${startIndentLevel} but ended at ${indentLevel}`);
-        } else if (node instanceof Text) {
-           output += node.text;
-        } else if (node instanceof SpaceOrLine) {
-            if (parentWrap) {
-                if (node.significance === "First") { indentLevel++; }
-                else if (node.significance === "Last") {
-                    this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: \"Last\" spacing has no matching indent");
-                    indentLevel--;
-                }
-                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            } else {
-                output += ' ';
-            }
-        } else if (node instanceof Line) {
-            if (parentWrap) {
-                if (node.significance === "First") { indentLevel++; }
-                else if (node.significance === "Last") {
-                    this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: \"Last\" spacing has no matching indent");
-                    indentLevel--;
-                }
-                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            } else {
-                output += " ";
-            }
-        } else if (node instanceof LineIndent) {
-            if (parentWrap) {
-                indentLevel++;
-                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            } else {
-                output += " ";
-            }
-        } else if (node instanceof LineDeindent) {
-            if (parentWrap) {
-                this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: LineDeindent has no matching indent");
-                indentLevel--;
-                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
-            } else {
-                output += " ";
-            }
+        if (node instanceof Text) {
+            return [node.text, indentLevel];
+        }
+        // Lines are rendered by the group containing them, which knows whether it wraps
+        if (node instanceof SpaceOrLine) {
+            return [' ', indentLevel];
         }
 
+        // A group that fits never has a child that wraps, children are never wider than their parent
+        const wrap = node.width() > MAX_WDITH;
+        // Indentation follows nesting: lines go one level deeper than the line the group starts on,
+        // and the line before the close tag goes back to it
+        const groupIndent = indentLevel;
+        const childIndent = node.indent ? groupIndent + 1 : groupIndent;
+        let output = '';
+
+        for (const child of node.nodes) {
+            if (child instanceof SpaceOrLine && wrap) {
+                indentLevel = child.beforeClose ? groupIndent : childIndent;
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+            } else {
+                const [text, endIndentLevel] = this.renderNode(child, indentLevel);
+                output += text;
+                indentLevel = endIndentLevel;
+            }
+        }
 
         return [output, indentLevel];
     }
@@ -360,7 +328,8 @@ export class Formatter {
         // first make a zipper
         let zipper = this.makeZipper(tree);
 
-        const fmtTree: Group = new Group([]);
+        // The document itself does not indent its children
+        const fmtTree: Group = new Group([], false);
         const fmtStack: Group[] = [ fmtTree ];
 
         // setup a loop to go until the end (!success)
@@ -398,36 +367,9 @@ export class Formatter {
                 // already holds the whole instruction, rendered as is like text
                 stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
-                // handled per 3b. in the algorithm spec
-                const prevNodeResult = zip.peekPrevious(zipper);
-                const nextNodeResult = zip.peekNext(zipper);
-                const prevNode = prevNodeResult.success ? prevNodeResult.item : null;
-                const nextNode = nextNodeResult.success ? nextNodeResult.item : null;
-                let space: FMTNode;
-
-                if (focus.onlySpace) {
-                    space = new SpaceOrLine();
-                    stackTop.nodes.push(space);
-                // prev tag == open tag && next tag != close tag
-                } else if (((prevNode !== null && (prevNode instanceof TagNode && !prevNode.selfClosing)) || prevNode === null)
-                    && (nextNode === null || !(nextNode instanceof CloseTagNode))) {
-                    space = new LineIndent();
-                    stackTop.nodes.push(space);
-                // prev tag != open tag && next tag == close tag
-                } else if ((prevNode === null || (prevNode instanceof TagNode && prevNode.selfClosing) || !(prevNode instanceof TagNode))
-                    && (nextNode === null || nextNode instanceof CloseTagNode)) {
-                    space = new LineDeindent();
-                    stackTop.nodes.push(space);
-                } else {
-                    space = new SpaceOrLine();
-                    stackTop.nodes.push(space);
-                }
-
-                if (focus.firstInTag && !focus.lastInTag) {
-                    space.significance = 'First';
-                } else if (!focus.firstInTag && focus.lastInTag) {
-                    space.significance = 'Last';
-                }
+                // handled per 5b. in the algorithm spec
+                const nextNode = zip.peekNext(zipper);
+                stackTop.nodes.push(new SpaceOrLine(nextNode.success && nextNode.item instanceof CloseTagNode));
             }
 
 

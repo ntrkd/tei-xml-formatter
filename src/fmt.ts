@@ -1,6 +1,5 @@
-export type FMTNode = Group | Text | Line | LineIndent | LineDeindent | SpaceOrLine;
+export type FMTNode = Group | Text | SpaceOrLine;
 export type Wrap = 'Wrap' | 'Detect' | 'NoWrap';
-type FirstLast = "First" | "Last" | "None";
 
 interface BaseFMTNode {
   kind: string;
@@ -11,9 +10,12 @@ interface BaseFMTNode {
 export class Group implements BaseFMTNode {
   public kind = "Group" as const;
   public nodes: FMTNode[];
+  // Whether lines inside the group are indented one level deeper than the line the group starts on
+  public indent: boolean;
 
-  constructor(nodes: FMTNode[]) {
+  constructor(nodes: FMTNode[], indent = true) {
     this.nodes = nodes;
+    this.indent = indent;
   }
 
   width() : number {
@@ -40,39 +42,17 @@ export class Text implements BaseFMTNode {
   }
 }
 
+/**
+ * Renders to a new line if the parent group needs wrapping, else renders to a space
+ */
 export class SpaceOrLine implements BaseFMTNode {
   public kind = "SpaceOrLine" as const;
-  public significance: FirstLast = "None";
+  // Whether the line comes right before the close tag of its group, which goes back to the group's indent
+  public beforeClose: boolean;
 
-  width() : number {
-    return 1;
+  constructor(beforeClose = false) {
+    this.beforeClose = beforeClose;
   }
-}
-
-/**
- * Renders to a line if the parent group needs wrapping, else renders to nothing
- */
-export class Line implements BaseFMTNode {
-  public kind = "Line" as const;
-  public significance: FirstLast = "None";
-
-  width() : number {
-    return 1;
-  }
-}
-
-export class LineIndent implements BaseFMTNode {
-  public kind = "LineIndent" as const;
-  public significance: FirstLast = "None";
-
-  width() : number {
-    return 1;
-  }
-}
-
-export class LineDeindent implements BaseFMTNode {
-  public kind = "LineDeindent" as const;
-  public significance: FirstLast = "None";
 
   width() : number {
     return 1;
