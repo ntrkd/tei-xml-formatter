@@ -148,9 +148,6 @@ export class SpacingNode implements BaseASTNode {
     kind = 'Spacing' as const;
     parent: ParentNode | null;
     id: number;
-    firstInTag: boolean;
-    lastInTag: boolean;
-    onlySpace: boolean;
 
     propogateRight: boolean;
     propogateLeft: boolean;
@@ -164,8 +161,5 @@ export class SpacingNode implements BaseASTNode {
         this.propogateRight = propogateRight;
         this.propogateLeft = propogateLeft;
         this.id = SpacingNode.uniqueIDCount++;
-        this.firstInTag = false;
-        this.lastInTag = false;
-        this.onlySpace = false;
     }
 }
