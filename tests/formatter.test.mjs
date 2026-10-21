@@ -84,6 +84,32 @@ test('keeps sibling indentation after a wrapped tag ending in a space', () => {
 });
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
 
+test('preserves comments without adding or removing surrounding spaces', () => {
+	assert.equal(new Formatter().format('<p>a<!--x-->b</p>'), '<p>a<!--x-->b</p>');
+	assert.equal(new Formatter().format('<p>a <!-- x --> b</p>'), '<p>a <!-- x --> b</p>');
+	assert.equal(new Formatter().format('<TEI><!--a--><!--b--></TEI>'), '<TEI><!--a--><!--b--></TEI>');
+	assert.equal(new Formatter().format('<p><!---->x</p>'), '<p><!---->x</p>');
+});
+
+test('preserves comments outside the root element', () => {
+	const formatted = new Formatter().format('<?xml version="1.0"?>\n<!-- top -->\n<TEI><p>x</p></TEI>\n<!-- end -->\n');
+
+	assert.equal(formatted, '<?xml version="1.0"?> <!-- top --> <TEI><p>x</p></TEI> <!-- end -->');
+});
+
+test('keeps multi-line comment bodies verbatim', () => {
+	const formatted = new Formatter().format('<TEI><p>x</p><!--\n  multi\n  line\n--></TEI>');
+
+	assert.equal(formatted, '<TEI><p>x</p><!--\n  multi\n  line\n--></TEI>');
+});
+
+test('indents comments as the first and last children of a wrapped tag', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const formatted = new Formatter().format(`<TEI>\n<!-- first -->\n<p>${long}</p>\n<!-- last -->\n</TEI>`);
+
+	assert.equal(formatted, `<TEI>\n\t<!-- first -->\n\t<p>${long}</p>\n\t<!-- last -->\n</TEI>`);
+});
+
 test('throws NegativeIndent when spacing would deindent below level 0', () => {
 	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
 	const lastSpaceOrLine = new SpaceOrLine();

@@ -1,5 +1,5 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import { DocumentNode, TagNode, TextNode, CommentNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
 import type { ParentNode, ASTNode } from './ast.js';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
 import type { FMTNode } from "./fmt.js";
@@ -94,6 +94,14 @@ export class Formatter {
             this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
             parent.children.push(new TextNode(`<?${pi.target}${pi.body !== "" ? ` ${pi.body}` : ``}?>`, parent));
+        });
+
+        this.saxes.on("comment", (comment) => {
+            const parent: ParentNode | undefined = stack[stack.length - 1];
+            this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
+
+            // Kept verbatim, the comment body is not whitespace collapsed
+            parent.children.push(new CommentNode(comment, parent));
         });
 
         this.saxes.on("xmldecl", dec => { // Always the first line in the XML document
@@ -306,6 +314,9 @@ export class Formatter {
             } else if (focus instanceof TextNode) {
                 // just add as a text node
                 stackTop.nodes.push(new Text(focus.text));
+            } else if (focus instanceof CommentNode) {
+                // rendered verbatim like text
+                stackTop.nodes.push(new Text(`<!--${focus.text}-->`));
             } else if (focus instanceof SpacingNode) {
                 // handled per 3b. in the algorithm spec
                 const prevNodeResult = zip.peekPrevious(zipper);

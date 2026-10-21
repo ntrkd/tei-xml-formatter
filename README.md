@@ -127,7 +127,7 @@ First uses saxes to parse the .xml file into code which can be processed easier 
 - Block tags are tags that make their own spacing during rendering thus ignoring the immediate spacing around them.
 - Inline tags are tags that depend on spacing near them. Having no space means the rendered text might be joined together. However, having even one space between multiple inline tags that aren't interrupted by text means that all of them can have spaces and not change the final layout.
 - I have yet to encouter a tag that has asymmetrical spacing requirements. So for now we disregard them.
-- Ignore everything but open tags, close tags, and text nodes for now. Comments, CDATA, Processing Instruction, and XML Declaration will be implemented at a later date.
+- Ignore everything but open tags, close tags, text nodes, comments, processing instructions, and the XML declaration for now. CDATA and doctype will be implemented at a later date. Comments are kept verbatim and are treated like text when deciding spacing.
 
 ## Credits
 
