@@ -16,6 +16,7 @@ export enum FormatterErrorCode {
     ZipperGoTopFailed = 'ZipperGoTopFailed',
     UnexpectedZipperState = 'UnexpectedZipperState',
     NegativeIndent = 'NegativeIndent',
+    UnbalancedIndent = 'UnbalancedIndent',
 }
 
 export class FormatterError extends Error {
@@ -211,12 +212,15 @@ export class Formatter {
         // if the parent decides to wrap, the child can decide to not wrap
         // if the parent decides to not wrap, every child (recursive) MUST not wrap
         if (node instanceof Group) {
+            const startIndentLevel = indentLevel;
             // call render node on all children and add em up
             for (const child of node.nodes) {
                 const renderChild = this.renderNode(child, nodeWrap, indentLevel);
                 output += renderChild[0];
                 indentLevel = renderChild[1];
             } 
+            // every indent inside a group is paired with a deindent in the same group, so it must end where it started
+            this.assert(indentLevel === startIndentLevel, FormatterErrorCode.UnbalancedIndent, `Group started at indent level ${startIndentLevel} but ended at ${indentLevel}`);
         } else if (node instanceof Text) {
            output += node.text;
         } else if (node instanceof SpaceOrLine) {
@@ -250,7 +254,8 @@ export class Formatter {
             }
         } else if (node instanceof LineDeindent) {
             if (parentWrap) {
-                indentLevel = Math.max(0, indentLevel - 1);
+                this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: LineDeindent has no matching indent");
+                indentLevel--;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += " ";
@@ -319,7 +324,7 @@ export class Formatter {
                     stackTop.nodes.push(space);
                 // prev tag != open tag && next tag == close tag
                 } else if ((prevNode === null || (prevNode instanceof TagNode && prevNode.selfClosing) || !(prevNode instanceof TagNode))
-                    && ((nextNode !== null && nextNode instanceof CloseTagNode)) || nextNode === null) {
+                    && (nextNode === null || nextNode instanceof CloseTagNode)) {
                     space = new LineDeindent();
                     stackTop.nodes.push(space);
                 } else {
