@@ -70,3 +70,15 @@ test('trailing whitespace does not change the formatting of a wrapped document',
 	}
 });
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/9
+
+// tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
+test('keeps sibling indentation after a wrapped tag ending in a space', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const formatted = new Formatter().format(`<TEI>\n<div>\n<p>a</p>\n<p>${long} </p><p>b</p>\n</div>\n</TEI>`);
+
+	assert.equal(
+		formatted,
+		`<TEI>\n\t<div>\n\t\t<p>a</p>\n\t\t<p>${long}\n\t\t</p>\n\t\t<p>b</p>\n\t</div>\n</TEI>`,
+	);
+});
+// tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
