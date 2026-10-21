@@ -294,8 +294,9 @@ export class Formatter {
             return [' ', indentLevel];
         }
 
-        // A group that fits never has a child that wraps, children are never wider than their parent
-        const wrap = node.width() > MAX_WDITH;
+        // The group starts after the indent of its line, each tab counts as one column like width().
+        // A group that fits never has a child that wraps, children render on the same line and are never wider than their parent
+        const wrap = indentLevel + node.width() > MAX_WDITH;
         // Indentation follows nesting: lines go one level deeper than the line the group starts on,
         // and the line before the close tag goes back to it
         const groupIndent = indentLevel;

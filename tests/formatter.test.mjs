@@ -268,4 +268,16 @@ test('keeps self-closing tags at the end of their line when wrapping', () => {
 		'<div>\n\t<p>Executive committee<lb />\n\t\t<name>S. H. Berg</name>, President<lb />\n\t\t<name>Louie Limbaugh</name>, Vice President<lb />\n\t\tMrs. E. G. McFadden, Secretary</p>\n</div>',
 	);
 });
+
+test('wraps a group that only exceeds the width because of its indentation', () => {
+	// <d> is 78 characters wide and starts after 3 tabs
+	const formatted = new Formatter().format(
+		'<a> <b> <c> <d> Letter to the committee about the new orphanage on Pearl Street, 1921 </d> </c> </b> </a>',
+	);
+
+	assert.equal(
+		formatted,
+		'<a>\n\t<b>\n\t\t<c>\n\t\t\t<d>\n\t\t\t\tLetter to the committee about the new orphanage on Pearl Street, 1921\n\t\t\t</d>\n\t\t</c>\n\t</b>\n</a>',
+	);
+});
 // self-closing tag spacing tests
