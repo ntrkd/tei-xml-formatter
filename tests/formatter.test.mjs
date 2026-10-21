@@ -160,3 +160,63 @@ test('throws UnbalancedIndent when a group does not end at the indent level it s
 		);
 	}
 });
+
+// xml entity handling tests
+test('keeps entity and character references in text as written', () => {
+	const cases = [
+		'<p>a &lt;choice&gt; &amp; b</p>',
+		'<p>x &#8212; y &#x2013; &#0162; &#34;q&#34; &apos;</p>',
+		'<p>a]]&gt;b</p>',
+	];
+
+	for (const xml of cases) {
+		assert.equal(new Formatter().format(xml), xml);
+	}
+});
+
+test('keeps references in attribute values as written', () => {
+	const formatted = new Formatter().format('<p n="a&amp;b &quot;c&quot; &lt; &#8212;">t</p>');
+
+	assert.equal(formatted, '<p n="a&amp;b &quot;c&quot; &lt; &#8212;">t</p>');
+});
+
+test('escapes double quotes from single quoted attribute values', () => {
+	const formatted = new Formatter().format(`<p n='say "hi" &amp; bye'>t</p>`);
+
+	assert.equal(formatted, '<p n="say &quot;hi&quot; &amp; bye">t</p>');
+});
+
+test('does not collapse whitespace written as a character reference', () => {
+	const formatted = new Formatter().format('<p n="l1&#10;l2">x&#10;y &#9; z</p>');
+
+	assert.equal(formatted, '<p n="l1&#10;l2">x&#10;y &#9; z</p>');
+});
+
+test('keeps references in comments and processing instructions as is', () => {
+	const formatted = new Formatter().format('<?pi a &amp; b?><p>a<!-- &lt;b&gt; &#8212; --></p>');
+
+	assert.equal(formatted, '<?pi a &amp; b?><p>a<!-- &lt;b&gt; &#8212; --></p>');
+});
+
+test('keeps private use characters already in the document', () => {
+	const formatted = new Formatter().format('<p> &amp;  &lt;</p>');
+
+	assert.equal(formatted, '<p> &amp;  &lt;</p>');
+});
+
+test('formatting output with references again does not change it', () => {
+	const formatter = new Formatter();
+	const once = formatter.format(`<TEI><p n='a "b"'>x &lt;y&gt; &#8212; z</p></TEI>`);
+
+	assert.equal(formatter.format(once), once);
+});
+
+test('throws ParserError for undefined entities and invalid character references', () => {
+	for (const xml of ['<p>&nbsp;</p>', '<p>&#0;</p>', '<p>&#xD800;</p>']) {
+		assert.throws(
+			() => new Formatter().format(xml),
+			(error) => error instanceof FormatterError && error.code === FormatterErrorCode.ParserError,
+		);
+	}
+});
+// xml entity handling tests
