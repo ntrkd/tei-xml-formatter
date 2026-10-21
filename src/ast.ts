@@ -7,6 +7,7 @@ export type ASTNode = DocumentNode
     | CloseTagNode
     | TextNode
     | CommentNode
+    | ProcessingInstructionNode
     | SpacingNode;
 
 export interface BaseASTNode {
@@ -111,6 +112,22 @@ export class TextNode implements BaseASTNode {
 // Comment Node - Contains the comment body (without <!-- -->) exactly as written in the source.
 export class CommentNode implements BaseASTNode {
     kind = 'Comment' as const;
+    text: string;
+    parent: ParentNode | null;
+
+    constructor(
+        text: string,
+        parent: ParentNode | null = null
+    ) {
+        this.text = text;
+        this.parent = parent;
+    }
+}
+
+// Processing Instruction Node - Contains a whole processing instruction or the XML declaration (with <? ?>),
+// exactly as it will be written. Kept separate from TextNode so following text is never merged into it.
+export class ProcessingInstructionNode implements BaseASTNode {
+    kind = 'ProcessingInstruction' as const;
     text: string;
     parent: ParentNode | null;
 

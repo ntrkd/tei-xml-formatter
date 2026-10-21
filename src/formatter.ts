@@ -1,5 +1,5 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CommentNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import { DocumentNode, TagNode, TextNode, CommentNode, ProcessingInstructionNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
 import type { ParentNode, ASTNode } from './ast.js';
 import { Group, Text, Line, LineIndent, LineDeindent, SpaceOrLine } from './fmt.js';
 import type { FMTNode } from "./fmt.js";
@@ -163,7 +163,8 @@ export class Formatter {
             this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
             const body = this.restoreReferences(pi.body);
-            parent.children.push(new TextNode(`<?${pi.target}${body !== "" ? ` ${body}` : ``}?>`, parent));
+            // Kept as is, the body is not whitespace collapsed
+            parent.children.push(new ProcessingInstructionNode(`<?${pi.target}${body !== "" ? ` ${body}` : ``}?>`, parent));
         });
 
         this.saxes.on("comment", (comment) => {
@@ -180,7 +181,7 @@ export class Formatter {
 
             const encoding = dec.encoding !== undefined ? ` encoding="${dec.encoding}"` : ``;
             const standalone = dec.standalone !== undefined ? ` standalone="${dec.standalone}"` : ``;
-            parent.children.push(new TextNode(`<?xml version="${dec.version}"${encoding}${standalone}?>`, parent));
+            parent.children.push(new ProcessingInstructionNode(`<?xml version="${dec.version}"${encoding}${standalone}?>`, parent));
         });
 
         this.saxes.on("opentag", (tag) => {
@@ -393,6 +394,9 @@ export class Formatter {
             } else if (focus instanceof CommentNode) {
                 // rendered verbatim like text
                 stackTop.nodes.push(new Text(`<!--${focus.text}-->`));
+            } else if (focus instanceof ProcessingInstructionNode) {
+                // already holds the whole instruction, rendered as is like text
+                stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
                 // handled per 3b. in the algorithm spec
                 const prevNodeResult = zip.peekPrevious(zipper);
