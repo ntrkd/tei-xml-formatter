@@ -17,7 +17,15 @@ export enum FormatterErrorCode {
     UnexpectedZipperState = 'UnexpectedZipperState',
     NegativeIndent = 'NegativeIndent',
     UnbalancedIndent = 'UnbalancedIndent',
+    PlaceholdersExhausted = 'PlaceholdersExhausted',
 }
+
+// Predefined entity and character references, the only references saxes decodes without a DTD
+const REFERENCE_PATTERN = /&(?:#x([0-9A-Fa-f]+)|#([0-9]+)|amp|lt|gt|quot|apos);/g;
+// References are swapped for characters from the Private Use Area while parsing
+const PLACEHOLDER_FIRST = 0xE000;
+const PLACEHOLDER_LAST = 0xF8FF;
+const PLACEHOLDER_PATTERN = /[-]/g;
 
 export class FormatterError extends Error {
     public readonly code: FormatterErrorCode;
@@ -34,9 +42,70 @@ export type FormatterErrorType = FormatterErrorCode;
 
 export class Formatter {
     private saxes: SaxesParser;
+    // Placeholder character -> the reference it replaced, as written in the source
+    private references = new Map<string, string>();
 
     constructor() {
         this.saxes = new SaxesParser();
+    }
+
+    /**
+     * Swap every reference saxes would decode for a placeholder character, so the reference is
+     * passed through the parser untouched and can be written out exactly as it was in the source
+     * @param doc Document to process
+     * @returns The document with references swapped for placeholders
+     */
+    private swapReferences(doc: string): string {
+        this.references = new Map();
+        const placeholders = new Map<string, string>(); // reference -> placeholder
+        // Placeholders must not collide with characters already in the document
+        const used = new Set(doc.match(PLACEHOLDER_PATTERN));
+        let next = PLACEHOLDER_FIRST;
+
+        return doc.replace(REFERENCE_PATTERN, (reference, hex: string | undefined, decimal: string | undefined) => {
+            // Leave invalid character references for saxes to report
+            if (hex !== undefined || decimal !== undefined) {
+                const codePoint = hex !== undefined ? parseInt(hex, 16) : parseInt(decimal ?? '', 10);
+                if (!this.isXmlChar(codePoint)) {
+                    return reference;
+                }
+            }
+
+            const existing = placeholders.get(reference);
+            if (existing !== undefined) {
+                return existing;
+            }
+
+            while (used.has(String.fromCodePoint(next))) {
+                next++;
+            }
+            this.assert(next <= PLACEHOLDER_LAST, FormatterErrorCode.PlaceholdersExhausted, "Ran out of placeholder characters for references");
+
+            const placeholder = String.fromCodePoint(next++);
+            placeholders.set(reference, placeholder);
+            this.references.set(placeholder, reference);
+            return placeholder;
+        });
+    }
+
+    /**
+     * Swap placeholders back for the references they replaced
+     * @param text Text containing placeholders
+     * @returns Text with the original references
+     */
+    private restoreReferences(text: string): string {
+        return text.replace(PLACEHOLDER_PATTERN, (char) => this.references.get(char) ?? char);
+    }
+
+    /**
+     * Whether a code point matches the Char production of the XML spec
+     * @param codePoint Code point to check
+     */
+    private isXmlChar(codePoint: number): boolean {
+        return codePoint === 0x9 || codePoint === 0xA || codePoint === 0xD
+            || (codePoint >= 0x20 && codePoint <= 0xD7FF)
+            || (codePoint >= 0xE000 && codePoint <= 0xFFFD)
+            || (codePoint >= 0x10000 && codePoint <= 0x10FFFF);
     }
 
     private assert(condition: boolean, code: FormatterErrorCode, message: string): asserts condition {
@@ -93,15 +162,16 @@ export class Formatter {
             const parent: ParentNode | undefined = stack[stack.length - 1];
             this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
-            parent.children.push(new TextNode(`<?${pi.target}${pi.body !== "" ? ` ${pi.body}` : ``}?>`, parent));
+            const body = this.restoreReferences(pi.body);
+            parent.children.push(new TextNode(`<?${pi.target}${body !== "" ? ` ${body}` : ``}?>`, parent));
         });
 
         this.saxes.on("comment", (comment) => {
             const parent: ParentNode | undefined = stack[stack.length - 1];
             this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
-            // Kept verbatim, the comment body is not whitespace collapsed
-            parent.children.push(new CommentNode(comment, parent));
+            // Kept as is, the comment body is not whitespace collapsed
+            parent.children.push(new CommentNode(this.restoreReferences(comment), parent));
         });
 
         this.saxes.on("xmldecl", dec => { // Always the first line in the XML document
@@ -117,7 +187,12 @@ export class Formatter {
             const parent: ParentNode | undefined = stack[stack.length - 1];
             this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
 
-            const node: TagNode = new TagNode(tag.name, tag.isSelfClosing, tag.attributes, undefined, parent);
+            // Values are stored as they will be written. Attributes are always written in double quotes,
+            // so a literal " (only possible in a single quoted value) has to be escaped
+            const attributes = Object.fromEntries(Object.entries(tag.attributes).map(
+                ([name, value]) => [name, this.restoreReferences(value.replaceAll('"', '&quot;'))],
+            ));
+            const node: TagNode = new TagNode(tag.name, tag.isSelfClosing, attributes, undefined, parent);
             parent.children.push(node);
             if (!tag.isSelfClosing) {
                 stack.push(node);
@@ -135,7 +210,8 @@ export class Formatter {
         });
 
         this.saxes.on("text", (text) => {
-            text = text.replace(/[\n\t ]+/g, ' ');
+            // References are restored first so whitespace written as a character reference is not collapsed
+            text = this.restoreReferences(text).replace(/[\n\t ]+/g, ' ');
 
             if (text !== "") {
                 const parent: ParentNode | undefined = stack[stack.length - 1];
@@ -188,7 +264,7 @@ export class Formatter {
                 }}
         });
 
-        this.saxes.write(doc).close();
+        this.saxes.write(this.swapReferences(doc)).close();
 
         const propogateSpaces = this.propogateSpaces(xmlDoc);
         // Whitespace outside the root element and spaces carried past it are direct children of the DocumentNode
