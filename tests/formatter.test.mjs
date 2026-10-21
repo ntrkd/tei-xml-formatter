@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Formatter, FormatterError, FormatterErrorCode } from '../dist/esm/index.js';
+import { Group, Line, SpaceOrLine, Text } from '../dist/esm/fmt.js';
 
 test('formats simple inline XML without changing text content', () => {
 	const formatted = new Formatter().format('<p>Hello <hi>world</hi></p>');
@@ -82,3 +83,17 @@ test('keeps sibling indentation after a wrapped tag ending in a space', () => {
 	);
 });
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
+
+test('throws NegativeIndent when "Last" spacing would deindent below level 0', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	for (const Spacing of [SpaceOrLine, Line]) {
+		const space = new Spacing();
+		space.significance = 'Last';
+		const tree = new Group([new Text(`<p>${long}`), space, new Text('</p>')]);
+
+		assert.throws(
+			() => new Formatter()['renderNode'](tree, false, 0),
+			(error) => error instanceof FormatterError && error.code === FormatterErrorCode.NegativeIndent,
+		);
+	}
+});

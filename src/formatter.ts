@@ -15,6 +15,7 @@ export enum FormatterErrorCode {
     FmtStackEmpty = 'FmtStackEmpty',
     ZipperGoTopFailed = 'ZipperGoTopFailed',
     UnexpectedZipperState = 'UnexpectedZipperState',
+    NegativeIndent = 'NegativeIndent',
 }
 
 export class FormatterError extends Error {
@@ -221,7 +222,10 @@ export class Formatter {
         } else if (node instanceof SpaceOrLine) {
             if (parentWrap) {
                 if (node.significance === "First") { indentLevel++; }
-                else if (node.significance === "Last") { indentLevel--; }
+                else if (node.significance === "Last") {
+                    this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: \"Last\" spacing has no matching indent");
+                    indentLevel--;
+                }
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += ' ';
@@ -229,7 +233,10 @@ export class Formatter {
         } else if (node instanceof Line) {
             if (parentWrap) {
                 if (node.significance === "First") { indentLevel++; }
-                else if (node.significance === "Last") { indentLevel--; }
+                else if (node.significance === "Last") {
+                    this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: \"Last\" spacing has no matching indent");
+                    indentLevel--;
+                }
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += " ";
