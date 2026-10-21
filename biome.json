@@ -1,17 +1,17 @@
 {
-    "$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
-    "files": {
-        "includes": ["src/**/*.ts"]
-    },
-    "linter": {
-        "rules": {
-            "correctness": {
-                "noUnusedVariables": "info",
-                "noUnusedPrivateClassMembers": "info"
-            },
-            "style": {
-                "noInferrableTypes": "error"
-            }
-        }
-    }
+	"$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
+	"files": {
+		"includes": ["src/**/*.ts"]
+	},
+	"linter": {
+		"rules": {
+			"correctness": {
+				"noUnusedVariables": "info",
+				"noUnusedPrivateClassMembers": "info"
+			},
+			"style": {
+				"noInferrableTypes": "error"
+			}
+		}
+	}
 }

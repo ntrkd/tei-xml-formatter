@@ -35,7 +35,7 @@ export abstract class BaseParentNode implements ParentNode {
 }
 
 export function isParentNode(node: BaseASTNode): node is ParentNode {
-    return Array.isArray((node as any).children);
+    return 'children' in node && Array.isArray(node.children);
 }
 
 // A DocumentNode - A Parent Node. Must be the root of the tree.

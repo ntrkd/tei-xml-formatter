@@ -7,8 +7,6 @@ import * as zip from './zipper.js';
 import type {
 	Zipper,
 	ZipperAdapter,
-	ZipperResult,
-	PeekResult,
 } from './zipper.js';
 
 export enum FormatterErrorCode {
@@ -17,6 +15,8 @@ export enum FormatterErrorCode {
     FmtStackEmpty = 'FmtStackEmpty',
     ZipperGoTopFailed = 'ZipperGoTopFailed',
     UnexpectedZipperState = 'UnexpectedZipperState',
+    NegativeIndent = 'NegativeIndent',
+    UnbalancedIndent = 'UnbalancedIndent',
 }
 
 export class FormatterError extends Error {
@@ -118,7 +118,8 @@ export class Formatter {
 
         this.saxes.on("closetag", (tag) => {
             if (stack.length !== 0 && !tag.isSelfClosing) {
-                const openTag: ParentNode = stack.pop()!;
+                const openTag: ParentNode | undefined = stack.pop();
+                this.assert(!!openTag, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
                 if (openTag instanceof TagNode) {
                     openTag.children.push(new CloseTagNode(tag.name, openTag));
                 }
@@ -148,8 +149,8 @@ export class Formatter {
 
                     previousNode.text = joinedProcessedText;
                 } else {
-                    const spaceAtFirst = text.charAt(0) === " " ? true : false;
-                    const spaceAtLast = text.charAt(text.length - 1) === " " ? true : false;
+                    const spaceAtFirst = text.charAt(0) === " ";
+                    const spaceAtLast = text.charAt(text.length - 1) === " ";
                     const textNode = new TextNode(text, parent); // Reference to edit obj later
 
                     // If text node is just a single space
@@ -181,15 +182,11 @@ export class Formatter {
 
         this.saxes.write(doc).close();
 
-        // Drop whitespace outside the root element first so it can't block spaces carried out of the root
-        this.trimLeadingSpacing(xmlDoc);
-        this.trimTrailingSpacing(xmlDoc);
-
         const propogateSpaces = this.propogateSpaces(xmlDoc);
-        this.markFirstLastSpacingInTags(propogateSpaces);
-        // Trim spaces carried to the ends after marking so they still count when pairing up First/Last spacing for indentation
+        // Whitespace outside the root element and spaces carried past it are direct children of the DocumentNode
         this.trimLeadingSpacing(propogateSpaces);
         this.trimTrailingSpacing(propogateSpaces);
+        this.markFirstLastSpacingInTags(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
         const formattedFile = this.renderNode(fmtTree, false, 0);
 
@@ -215,18 +212,24 @@ export class Formatter {
         // if the parent decides to wrap, the child can decide to not wrap
         // if the parent decides to not wrap, every child (recursive) MUST not wrap
         if (node instanceof Group) {
+            const startIndentLevel = indentLevel;
             // call render node on all children and add em up
             for (const child of node.nodes) {
                 const renderChild = this.renderNode(child, nodeWrap, indentLevel);
                 output += renderChild[0];
                 indentLevel = renderChild[1];
             } 
+            // every indent inside a group is paired with a deindent in the same group, so it must end where it started
+            this.assert(indentLevel === startIndentLevel, FormatterErrorCode.UnbalancedIndent, `Group started at indent level ${startIndentLevel} but ended at ${indentLevel}`);
         } else if (node instanceof Text) {
            output += node.text;
         } else if (node instanceof SpaceOrLine) {
             if (parentWrap) {
                 if (node.significance === "First") { indentLevel++; }
-                else if (node.significance === "Last") { indentLevel--; }
+                else if (node.significance === "Last") {
+                    this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: \"Last\" spacing has no matching indent");
+                    indentLevel--;
+                }
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += ' ';
@@ -234,7 +237,10 @@ export class Formatter {
         } else if (node instanceof Line) {
             if (parentWrap) {
                 if (node.significance === "First") { indentLevel++; }
-                else if (node.significance === "Last") { indentLevel--; }
+                else if (node.significance === "Last") {
+                    this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: \"Last\" spacing has no matching indent");
+                    indentLevel--;
+                }
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += " ";
@@ -248,7 +254,8 @@ export class Formatter {
             }
         } else if (node instanceof LineDeindent) {
             if (parentWrap) {
-                indentLevel = Math.max(0, indentLevel - 1);
+                this.assert(indentLevel > 0, FormatterErrorCode.NegativeIndent, "Tried to deindent below level 0: LineDeindent has no matching indent");
+                indentLevel--;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
             } else {
                 output += " ";
@@ -317,7 +324,7 @@ export class Formatter {
                     stackTop.nodes.push(space);
                 // prev tag != open tag && next tag == close tag
                 } else if ((prevNode === null || (prevNode instanceof TagNode && prevNode.selfClosing) || !(prevNode instanceof TagNode))
-                    && ((nextNode !== null && nextNode instanceof CloseTagNode)) || nextNode === null) {
+                    && (nextNode === null || nextNode instanceof CloseTagNode)) {
                     space = new LineDeindent();
                     stackTop.nodes.push(space);
                 } else {
@@ -348,7 +355,8 @@ export class Formatter {
     }
 
     /**
-     * Remove SpacingNodes that come before any content in the document (e.g. whitespace before the root element)
+     * Remove SpacingNodes that come before any content in the document
+     * (e.g. whitespace before the root element, or a space propogated past the root open tag)
      * @param node Node to process (the DocumentNode)
      */
     private trimLeadingSpacing(node: ASTNode): void {
@@ -363,7 +371,7 @@ export class Formatter {
     }
 
     /**
-     * Recursively remove SpacingNodes that come after all content in the document
+     * Remove SpacingNodes that come after all content in the document
      * (e.g. a trailing newline after the root element, or a space propogated past the root close tag)
      * @param node Node to process (the DocumentNode)
      */
@@ -372,14 +380,9 @@ export class Formatter {
             return;
         }
 
+        // A TagNode always ends with its CloseTagNode, so only the top level can have trailing spaces
         while (node.children[node.children.length - 1] instanceof SpacingNode) {
             node.children.pop();
-        }
-
-        // Propogated spaces can be inserted after a CloseTagNode, so look inside the last child as well
-        const lastChild: ASTNode | undefined = node.children[node.children.length - 1];
-        if (lastChild !== undefined) {
-            this.trimTrailingSpacing(lastChild);
         }
     }
 
@@ -445,7 +448,7 @@ export class Formatter {
                     let leftPropogation: Zipper<ASTNode> = current;
                     // Break manually when we hit a node we cannot carry over
                     while (true) {
-                        let tryPrev = zip.goPrevious(leftPropogation);
+                        const tryPrev = zip.goPrevious(leftPropogation);
                         if (tryPrev.success) {
                             leftPropogation = tryPrev.zipper;
                         } else {
@@ -460,20 +463,19 @@ export class Formatter {
                             const peekPrev = zip.peekPrevious(leftPropogation);
                             // previous node must not be SpacingNode
                             if (peekPrev.success && !(peekPrev.item instanceof SpacingNode) || !peekPrev.success) {
-                                let spaceLeftInsert = zip.insertLeft(leftPropogation, new SpacingNode(leftPropogation.focus.parent, true, true));
+                                const spaceLeftInsert = zip.insertLeft(leftPropogation, new SpacingNode(leftPropogation.focus.parent, true, true));
                                 if (!spaceLeftInsert.success) {
                                     console.warn("Tried to insert a space at the root node");
                                     break;
                                 }
 
-                                let oneNodeBack = zip.goPrevious(spaceLeftInsert.zipper);
+                                const oneNodeBack = zip.goPrevious(spaceLeftInsert.zipper);
                                 if (!oneNodeBack.success) {
                                     console.warn("Impossible state");
                                     break;
                                 }
 
                                 leftPropogation = oneNodeBack.zipper;
-                                continue;
                             } else {
                                 currentNode.propogateLeft = true;
                                 break; // Cannot carry space so break
@@ -489,7 +491,7 @@ export class Formatter {
                     let rightPropogation: Zipper<ASTNode> = current;
                     // break manually when we hit a node we cannot carry over
                     while (true) {
-                        let tryNext = zip.goNext(rightPropogation);
+                        const tryNext = zip.goNext(rightPropogation);
                         if (tryNext.success) {
                             rightPropogation = tryNext.zipper;
                         } else {
@@ -499,25 +501,30 @@ export class Formatter {
                         }
 
                         if (rightPropogation.focus instanceof CloseTagNode) {
-                            // if no space node to right, insert space node then goNext
+                            // if no space node to right of the closed TagNode, insert space node after it then goRight
+                            // The CloseTagNode is the last child of its TagNode, so the space must be inserted on the TagNode itself
+                            const parentTag = zip.goUp(rightPropogation);
+                            if (!parentTag.success) {
+                                console.warn("CloseTagNode has no parent TagNode");
+                                break;
+                            }
 
-                            const peekNext = zip.peekNext(rightPropogation);
+                            const nextSibling = zip.goRight(parentTag.zipper);
                             // next node must not be SpacingNode
-                            if (peekNext.success && !(peekNext.item instanceof SpacingNode) || !peekNext.success) {
-                                let spaceRightInsert = zip.insertRight(rightPropogation, new SpacingNode(rightPropogation.focus.parent, true, true));
+                            if (nextSibling.success && !(nextSibling.zipper.focus instanceof SpacingNode) || !nextSibling.success) {
+                                const spaceRightInsert = zip.insertRight(parentTag.zipper, new SpacingNode(parentTag.zipper.focus.parent, true, true));
                                 if (!spaceRightInsert.success) {
                                     console.warn("Tried to insert a space at the root node");
                                     break;
                                 }
 
-                                let oneNodeForward = zip.goNext(spaceRightInsert.zipper);
+                                const oneNodeForward = zip.goRight(spaceRightInsert.zipper);
                                 if (!oneNodeForward.success) {
                                     console.warn("Impossible state");
                                     break;
                                 }
 
                                 rightPropogation = oneNodeForward.zipper;
-                                continue;
                             } else {
                                 currentNode.propogateRight = true;
                                 break; // Cannot carry space so break
@@ -564,6 +571,7 @@ export class Formatter {
      * @param node Tree to be seralized
      * @returns stringified tree
      */
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: debug helper
     private serializeFmt(node: FMTNode): string {
         // Custom replacer to skip the parent property
         return JSON.stringify(node, (key, value) => {
@@ -577,6 +585,7 @@ export class Formatter {
      * @param node Tree to be seralized
      * @returns stringified tree
      */
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: debug helper
     private serializeNode(node: ASTNode): string {
         return JSON.stringify(
             node,
@@ -588,7 +597,7 @@ export class Formatter {
                 if (value && typeof value === 'object') {
                     const ctor = value.constructor;
                     if (ctor && ctor !== Object) {
-                        const result: any = { _type: ctor.name };
+                        const result: { _type: string; children?: unknown; [propName: string]: unknown } = { _type: ctor.name };
 
                         // copy over properties except children first
                         for (const [propName, propValue] of Object.entries(value)) {
@@ -600,7 +609,7 @@ export class Formatter {
 
                         // append children at end if present
                         if ('children' in value) {
-                            result.children = (value as any).children;
+                            result.children = value.children;
                         }
 
                         return result;

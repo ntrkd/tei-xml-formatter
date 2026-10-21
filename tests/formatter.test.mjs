@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Formatter, FormatterError, FormatterErrorCode } from '../dist/esm/index.js';
+import { Group, Line, LineDeindent, LineIndent, SpaceOrLine, Text } from '../dist/esm/fmt.js';
 
 test('formats simple inline XML without changing text content', () => {
 	const formatted = new Formatter().format('<p>Hello <hi>world</hi></p>');
@@ -70,3 +71,51 @@ test('trailing whitespace does not change the formatting of a wrapped document',
 	}
 });
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/9
+
+// tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
+test('keeps sibling indentation after a wrapped tag ending in a space', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const formatted = new Formatter().format(`<TEI>\n<div>\n<p>a</p>\n<p>${long} </p><p>b</p>\n</div>\n</TEI>`);
+
+	assert.equal(
+		formatted,
+		`<TEI>\n\t<div>\n\t\t<p>a</p>\n\t\t<p>${long}\n\t\t</p>\n\t\t<p>b</p>\n\t</div>\n</TEI>`,
+	);
+});
+// tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
+
+test('throws NegativeIndent when spacing would deindent below level 0', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const lastSpaceOrLine = new SpaceOrLine();
+	lastSpaceOrLine.significance = 'Last';
+	const lastLine = new Line();
+	lastLine.significance = 'Last';
+
+	for (const space of [lastSpaceOrLine, lastLine, new LineDeindent()]) {
+		const tree = new Group([new Text(`<p>${long}`), space, new Text('</p>')]);
+
+		assert.throws(
+			() => new Formatter()['renderNode'](tree, false, 0),
+			(error) => error instanceof FormatterError && error.code === FormatterErrorCode.NegativeIndent,
+		);
+	}
+});
+
+test('throws UnbalancedIndent when a group does not end at the indent level it started at', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const cases = [
+		// indent with no matching deindent
+		{ space: new LineIndent(), indentLevel: 0 },
+		// deindent with no matching indent, nested deep enough that it never goes below 0
+		{ space: new LineDeindent(), indentLevel: 2 },
+	];
+
+	for (const { space, indentLevel } of cases) {
+		const tree = new Group([new Text(`<p>${long}`), space, new Text('</p>')]);
+
+		assert.throws(
+			() => new Formatter()['renderNode'](tree, false, indentLevel),
+			(error) => error instanceof FormatterError && error.code === FormatterErrorCode.UnbalancedIndent,
+		);
+	}
+});
