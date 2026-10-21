@@ -16,6 +16,7 @@ export enum FormatterErrorCode {
     ZipperGoTopFailed = 'ZipperGoTopFailed',
     UnexpectedZipperState = 'UnexpectedZipperState',
     PlaceholdersExhausted = 'PlaceholdersExhausted',
+    UnsupportedNode = 'UnsupportedNode',
 }
 
 // Predefined entity and character references, the only references saxes decodes without a DTD
@@ -367,6 +368,11 @@ export class Formatter {
                 // handled per 5b. in the algorithm spec
                 const nextNode = zip.peekNext(zipper);
                 stackTop.nodes.push(new SpaceOrLine(nextNode.success && nextNode.item instanceof CloseTagNode));
+            } else {
+                // A node without a case above would be silently dropped from the output,
+                // so every ASTNode type must be handled (checked at compile time by the never type)
+                const unsupported: never = focus;
+                throw new FormatterError(FormatterErrorCode.UnsupportedNode, `Cannot format AST node of kind ${(unsupported as ASTNode).kind}`);
             }
 
 
