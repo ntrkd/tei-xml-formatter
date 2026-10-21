@@ -90,7 +90,7 @@ console.log(formattedText);
 ## Algorithm
 
 ### TL;DR
-First uses saxes to parse the .xml file into code which can be processed easier than raw text. First we construct a tree called an Abstract Syntax Tree (AST). This contains enough information to distinguish between Tag Nodes, Close Tag Nodes, Text, and Spaces. Then we take that, process it a bit more and lower it into a Formatting Tree which strips out even more information down to just Groups (contain Text and Space nodes), Text, and Spacing Nodes (Line Indent/Deindent, Space or Line). From here there is very little information to process and most of the formatting has been done. We render the Formatting Tree into raw text again.
+First uses saxes to parse the .xml file into code which can be processed easier than raw text. First we construct a tree called an Abstract Syntax Tree (AST). This contains enough information to distinguish between Tag Nodes, Close Tag Nodes, Text, and Spaces. Then we take that, process it a bit more and lower it into a Formatting Tree which strips out even more information down to just Groups (contain Text and Space nodes), Text, and SpaceOrLine nodes. From here there is very little information to process and most of the formatting has been done. We render the Formatting Tree into raw text again.
 
 ### Steps
 
@@ -120,17 +120,15 @@ First uses saxes to parse the .xml file into code which can be processed easier 
    
     a. Convert all nodes normally into text. Spacing nodes require more attention.
    
-    b. When we encounter a spacing node, we look backward and forward to see what type of FMT node to insert.
-   
-	- LineIndent - If the previous tag is an open tag and the next node is not a close tag
-	- LineDeindent - If the previous tag is not an open tag and the next node is a close tag
-	- SpaceOrLine - Default
+    b. Every spacing node becomes a SpaceOrLine. We look forward to mark the ones that come right before a close tag.
    
     // TODO: A group of carried Spacing nodes should be linked together. As if all them dont need to be wrapped, only one of the Spacing nodes needs to become a space. Not all of them.
 
 7. Generate the final XML using the formatting tree.
 
     a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
+
+    b. Indentation follows nesting. In a wrapping group, a SpaceOrLine becomes a new line one level deeper than the line the group started on. A SpaceOrLine right before the close tag goes back to that line's level. The document itself does not indent.
 
 ## Definitions and Observations
 
