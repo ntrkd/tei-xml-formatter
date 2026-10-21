@@ -49,9 +49,12 @@ export class SpaceOrLine implements BaseFMTNode {
   public kind = "SpaceOrLine" as const;
   // Whether the line comes right before the close tag of its group, which goes back to the group's indent
   public beforeClose: boolean;
+  // Whether the line always renders to a new line, e.g. next to an <lb/>
+  public forced: boolean;
 
-  constructor(beforeClose = false) {
+  constructor(beforeClose = false, forced = false) {
     this.beforeClose = beforeClose;
+    this.forced = forced;
   }
 
   width() : number {

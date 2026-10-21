@@ -28,6 +28,8 @@ const PLACEHOLDER_PATTERN = /[-]/g;
 const MAX_WDITH = 80;
 const INDENT_UNIT = '\t';
 const NEWLINE = '\n';
+// Self-closing tags that end their line when there is a space next to them
+const LINE_END_TAGS = ['lb'];
 
 export class FormatterError extends Error {
     public readonly code: FormatterErrorCode;
@@ -46,6 +48,7 @@ export class Formatter {
     private saxes: SaxesParser;
     // Placeholder character -> the reference it replaced, as written in the source
     private references = new Map<string, string>();
+    private lineEndTags = new Set(LINE_END_TAGS);
 
     constructor() {
         this.saxes = new SaxesParser();
@@ -304,7 +307,7 @@ export class Formatter {
         let output = '';
 
         for (const child of node.nodes) {
-            if (child instanceof SpaceOrLine && wrap) {
+            if (child instanceof SpaceOrLine && (wrap || child.forced)) {
                 indentLevel = child.beforeClose ? groupIndent : childIndent;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
                 column = indentLevel;
@@ -327,6 +330,33 @@ export class Formatter {
     private endColumn(text: string, column: number): number {
         const lastNewLine = text.lastIndexOf(NEWLINE);
         return lastNewLine === -1 ? column + text.length : text.length - lastNewLine - 1;
+    }
+
+    /**
+     * Whether a node is a self-closing tag that ends its line
+     * @param node Node to check
+     */
+    private isLineEndTag(node: ASTNode): boolean {
+        return node instanceof TagNode && node.selfClosing && this.lineEndTags.has(node.name);
+    }
+
+    /**
+     * Whether a space has to become a new line so a line end tag (like <lb/>) ends its line.
+     * That is the space after the tag, or the space before it when it has none after it
+     * @param zipper Zipper focused on the SpacingNode
+     */
+    private isForcedLine(zipper: Zipper<ASTNode>): boolean {
+        const left = zip.goLeft(zipper);
+        if (left.success && this.isLineEndTag(left.zipper.focus)) {
+            return true;
+        }
+
+        const right = zip.goRight(zipper);
+        if (!right.success || !this.isLineEndTag(right.zipper.focus)) {
+            return false;
+        }
+        const afterTag = zip.goRight(right.zipper);
+        return !(afterTag.success && afterTag.zipper.focus instanceof SpacingNode);
     }
 
     /**
@@ -379,7 +409,7 @@ export class Formatter {
             } else if (focus instanceof SpacingNode) {
                 // handled per 5b. in the algorithm spec
                 const nextNode = zip.peekNext(zipper);
-                stackTop.nodes.push(new SpaceOrLine(nextNode.success && nextNode.item instanceof CloseTagNode));
+                stackTop.nodes.push(new SpaceOrLine(nextNode.success && nextNode.item instanceof CloseTagNode, this.isForcedLine(zipper)));
             }
 
 

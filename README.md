@@ -122,6 +122,8 @@ First uses saxes to parse the .xml file into code which can be processed easier 
     a. Convert all nodes normally into text. Spacing nodes require more attention.
    
     b. Every spacing node becomes a SpaceOrLine. We look forward to mark the ones that come right before a close tag.
+
+    c. A SpaceOrLine after an `<lb/>`, or before one that has no space after it, is forced to be a new line.
    
     // TODO: A group of carried Spacing nodes should be linked together. As if all them dont need to be wrapped, only one of the Spacing nodes needs to become a space. Not all of them.
 
@@ -130,6 +132,8 @@ First uses saxes to parse the .xml file into code which can be processed easier 
     a. A group wraps when the column it starts at plus its width() is over 80. Each tab counts as one column.
 
     b. Indentation follows nesting. In a wrapping group, a SpaceOrLine becomes a new line one level deeper than the line the group started on. A SpaceOrLine right before the close tag goes back to that line's level. The document itself does not indent.
+
+    c. Forced lines always break.
 
 ## Definitions and Observations
 

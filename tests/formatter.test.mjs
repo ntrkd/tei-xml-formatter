@@ -241,9 +241,9 @@ test('indents children of a tag that shares a line with its parent', () => {
 // self-closing tag spacing tests
 test('does not carry a space before a self-closing tag', () => {
 	const cases = [
-		{ xml: '<p>Episco<lb break="no"/>\npal and Jackson-<lb/>\nville</p>', expected: '<p>Episco<lb break="no" /> pal and Jackson-<lb /> ville</p>' },
-		{ xml: '<p><lb/> text</p>', expected: '<p><lb /> text</p>' },
-		{ xml: '<p>a<pb n="2"/><lb/> b</p>', expected: '<p>a<pb n="2" /><lb /> b</p>' },
+		{ xml: '<p>Episco<lb break="no"/>\npal and Jackson-<lb/>\nville</p>', expected: '<p>Episco<lb break="no" />\n\tpal and Jackson-<lb />\n\tville</p>' },
+		{ xml: '<p><lb/> text</p>', expected: '<p><lb />\n\ttext</p>' },
+		{ xml: '<p>a<pb n="2"/><lb/> b</p>', expected: '<p>a<pb n="2" /><lb />\n\tb</p>' },
 		{ xml: '<div><p>x</p><milestone unit="section"/> <p>y</p></div>', expected: '<div><p>x</p><milestone unit="section" /> <p>y</p></div>' },
 	];
 
@@ -253,9 +253,25 @@ test('does not carry a space before a self-closing tag', () => {
 });
 
 test('keeps spaces around self-closing tags that were in the source', () => {
-	for (const xml of ['<p>a <lb/> b</p>', '<p>word <lb/>next</p>']) {
-		assert.equal(new Formatter().format(xml), xml.replace('<lb/>', '<lb />'));
+	for (const xml of ['<p>a <pb/> b</p>', '<p>word <pb/>next</p>']) {
+		assert.equal(new Formatter().format(xml), xml.replace('<pb/>', '<pb />'));
 	}
+});
+
+test('ends the line at an lb with a space after it', () => {
+	assert.equal(new Formatter().format('<p>a <lb/> b</p>'), '<p>a <lb />\n\tb</p>');
+	assert.equal(
+		new Formatter().format('<p>Executive committee<lb/>\nS. H. Berg, President</p>'),
+		'<p>Executive committee<lb />\n\tS. H. Berg, President</p>',
+	);
+});
+
+test('starts the line at an lb with only a space before it', () => {
+	assert.equal(new Formatter().format('<p>word <lb/>next</p>'), '<p>word\n\t<lb />next</p>');
+});
+
+test('keeps an lb without spaces around it on its line', () => {
+	assert.equal(new Formatter().format('<p>Episco<lb break="no"/>pal</p>'), '<p>Episco<lb break="no" />pal</p>');
 });
 
 test('keeps self-closing tags at the end of their line when wrapping', () => {
