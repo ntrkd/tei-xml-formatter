@@ -6,6 +6,7 @@ export type ASTNode = DocumentNode
     | TagNode
     | CloseTagNode
     | TextNode
+    | CommentNode
     | SpacingNode;
 
 export interface BaseASTNode {
@@ -95,6 +96,21 @@ export class CloseTagNode implements BaseASTNode {
 // Text Node - Contains a single field of type string which is editable after initialization.
 export class TextNode implements BaseASTNode {
     kind = 'Text' as const;
+    text: string;
+    parent: ParentNode | null;
+
+    constructor(
+        text: string,
+        parent: ParentNode | null = null
+    ) {
+        this.text = text;
+        this.parent = parent;
+    }
+}
+
+// Comment Node - Contains the comment body (without <!-- -->) exactly as written in the source.
+export class CommentNode implements BaseASTNode {
+    kind = 'Comment' as const;
     text: string;
     parent: ParentNode | null;
 
