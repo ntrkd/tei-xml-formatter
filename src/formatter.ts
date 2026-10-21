@@ -271,7 +271,6 @@ export class Formatter {
         // Whitespace outside the root element and spaces carried past it are direct children of the DocumentNode
         this.trimLeadingSpacing(propogateSpaces);
         this.trimTrailingSpacing(propogateSpaces);
-        this.markFirstLastSpacingInTags(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
         const formattedFile = this.renderNode(fmtTree, 0);
 
@@ -416,52 +415,6 @@ export class Formatter {
         // A TagNode always ends with its CloseTagNode, so only the top level can have trailing spaces
         while (node.children[node.children.length - 1] instanceof SpacingNode) {
             node.children.pop();
-        }
-    }
-
-    /**
-     * Helper function to recursively mark the first and last spacing (and whether they are alone) within TagNode
-     * @param node Node to process
-     */
-    private markFirstLastSpacingInTags(node: ASTNode): void {
-        if (node instanceof TagNode) {
-            // find first and last SpacingNode among this TagNodes children
-            let firstSpacing: SpacingNode | null = null;
-            let lastSpacing: SpacingNode | null = null;
-            let lastSpace: SpacingNode | null = null;
-            let numSpaces = 0;
-            
-            for (const child of node.children) {
-                if (child instanceof SpacingNode) {
-                    lastSpace = child;
-                    numSpaces++;
-
-                    if (firstSpacing === null) {
-                        firstSpacing = child;
-                    }
-                    lastSpacing = child;
-                }
-            }
-
-            // mark the space as lonely
-            if (numSpaces === 1 && lastSpace !== null) {
-                lastSpace.onlySpace = true;
-            }
-            
-            // mark the first and last spacing nodes
-            if (firstSpacing !== null) {
-                firstSpacing.firstInTag = true;
-            }
-            if (lastSpacing !== null) {
-                lastSpacing.lastInTag = true;
-            }
-        }
-        
-        // process children
-        if (isParentNode(node)) {
-            for (const child of node.children) {
-                this.markFirstLastSpacingInTags(child);
-            }
         }
     }
 
