@@ -9,6 +9,7 @@ export type ASTNode = DocumentNode
     | CommentNode
     | CDataNode
     | ProcessingInstructionNode
+    | DoctypeNode
     | SpacingNode;
 
 export interface BaseASTNode {
@@ -145,6 +146,22 @@ export class CDataNode implements BaseASTNode {
 // exactly as it will be written. Kept separate from TextNode so following text is never merged into it.
 export class ProcessingInstructionNode implements BaseASTNode {
     kind = 'ProcessingInstruction' as const;
+    text: string;
+    parent: ParentNode | null;
+
+    constructor(
+        text: string,
+        parent: ParentNode | null = null
+    ) {
+        this.text = text;
+        this.parent = parent;
+    }
+}
+
+// Doctype Node - Contains the whole doctype declaration (with <!DOCTYPE >), including any internal subset,
+// exactly as it will be written.
+export class DoctypeNode implements BaseASTNode {
+    kind = 'Doctype' as const;
     text: string;
     parent: ParentNode | null;
 

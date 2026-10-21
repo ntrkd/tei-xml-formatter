@@ -1,5 +1,5 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CommentNode, CDataNode, ProcessingInstructionNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import { DocumentNode, TagNode, TextNode, CommentNode, CDataNode, ProcessingInstructionNode, DoctypeNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
 import type { ParentNode, ASTNode } from './ast.js';
 import { Group, Text, SpaceOrLine } from './fmt.js';
 import type { FMTNode } from "./fmt.js";
@@ -191,6 +191,15 @@ export class Formatter {
             parent.children.push(new ProcessingInstructionNode(`<?xml version="${dec.version}"${encoding}${standalone}?>`, parent));
         });
 
+        this.saxes.on("doctype", (doctype) => {
+            const parent: ParentNode | undefined = stack[stack.length - 1];
+            this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
+
+            // saxes reports everything between <!DOCTYPE and >, so the whitespace after the keyword and
+            // the internal subset are kept as is
+            parent.children.push(new DoctypeNode(`<!DOCTYPE${this.restoreReferences(doctype)}>`, parent));
+        });
+
         this.saxes.on("opentag", (tag) => {
             const parent: ParentNode | undefined = stack[stack.length - 1];
             this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
@@ -374,6 +383,9 @@ export class Formatter {
                 stackTop.nodes.push(new Text(`<![CDATA[${focus.text}]]>`));
             } else if (focus instanceof ProcessingInstructionNode) {
                 // already holds the whole instruction, rendered as is like text
+                stackTop.nodes.push(new Text(focus.text));
+            } else if (focus instanceof DoctypeNode) {
+                // already holds the whole declaration, rendered as is like text
                 stackTop.nodes.push(new Text(focus.text));
             } else if (focus instanceof SpacingNode) {
                 // handled per 5b. in the algorithm spec
