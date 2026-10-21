@@ -9,40 +9,53 @@ This is a TypeScript library that formats [TEI XML](https://tei-c.org/) files. I
 ### Unformatted
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="custom.xsl"?>
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
-<text><body><div type="letter">
-<head>Letter from Emily to John</head><p><hi rend="italic">Dear John,</hi><lb/> I hope this letter finds you well.
-The weather here has been <hi rend="bold">unusually warm</hi> for October.
-</p><p>I have enclosed the sketches you asked for.
-<note type="editorial">Original note: “See attached drawings.”</note></p>
-<closer><salute> Yours sincerely, </salute>
-<signed>Emily</signed>
-</closer></div><hi> 80 808 0808 080808080808 0808008 8 8 08 08 08 80 80 80 8080 8080 8008 080 8080 8080 080 0
-</hi></body></text></TEI>
+<teiHeader> <fileDesc>
+      <titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
+  <sourceDesc> <p>Original manuscript, private collection.</p>
+</sourceDesc> </fileDesc> </teiHeader>
+<text>
+    <body> <div type="letter">
+<opener> <dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
+        <salute>My dear John,</salute> </opener>
+  <p>
+The sketches are enclosed &#8212; the harbour,
+the mill &amp; the church at <placeName>Wells</placeName>.     I hope they
+           arrive <choice><sic>safly</sic><corr>safely</corr></choice> before the end of the month.
+</p>
+<!-- signature is in a different ink -->
+      <closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
+</div> </body>
+  </text>
+</TEI>
 ```
 
 ### Formatted
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="custom.xsl"?>
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
+	<teiHeader>
+		<fileDesc>
+			<titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
+			<sourceDesc> <p>Original manuscript, private collection.</p> </sourceDesc>
+		</fileDesc>
+	</teiHeader>
 	<text>
 		<body>
 			<div type="letter">
-				<head>Letter from Emily to John</head><p><hi rend="italic">Dear John,</hi>
-					<lb />
-					I hope this letter finds you well. The weather here has been
-					<hi rend="bold">unusually warm</hi>
-					for October.
+				<opener>
+					<dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
+					<salute>My dear John,</salute>
+				</opener>
+				<p>
+					The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
+					<placeName>Wells</placeName>. I hope they arrive
+					<choice><sic>safly</sic><corr>safely</corr></choice>
+					before the end of the month.
 				</p>
-				<p>I have enclosed the sketches you asked for.
-				<note type="editorial">Original note: “See attached drawings.”</note></p>
-				<closer> <salute> Yours sincerely, </salute> <signed>Emily</signed> </closer>
+				<!-- signature is in a different ink -->
+				<closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
 			</div>
-			<hi>
-				80 808 0808 080808080808 0808008 8 8 08 08 08 80 80 80 8080 8080 8008 080 8080 8080 080 0
-			</hi>
 		</body>
 	</text>
 </TEI>
