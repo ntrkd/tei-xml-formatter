@@ -50,8 +50,8 @@ the mill &amp; the church at <placeName>Wells</placeName>.     I hope they
 				<p>
 					The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
 					<placeName>Wells</placeName>. I hope they arrive
-					<choice><sic>safly</sic><corr>safely</corr></choice>
-					before the end of the month.
+					<choice><sic>safly</sic><corr>safely</corr></choice> before the end of the
+					month.
 				</p>
 				<!-- signature is in a different ink -->
 				<closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
@@ -123,7 +123,9 @@ First uses saxes to parse the .xml file into code which can be processed easier 
    
     b. Every spacing node becomes a SpaceOrLine. We look forward to mark the ones that come right before a close tag.
 
-    c. A SpaceOrLine after an `<lb/>`, or before one that has no space after it, is forced to be a new line.
+    c. A tag with text directly inside it flows like text, and so does everything inside it. Its text is split into words with a SpaceOrLine between each.
+
+    d. A SpaceOrLine after an `<lb/>`, or before one that has no space after it, is forced to be a new line.
    
     // TODO: A group of carried Spacing nodes should be linked together. As if all them dont need to be wrapped, only one of the Spacing nodes needs to become a space. Not all of them.
 
@@ -133,7 +135,9 @@ First uses saxes to parse the .xml file into code which can be processed easier 
 
     b. Indentation follows nesting. In a wrapping group, a SpaceOrLine becomes a new line one level deeper than the line the group started on. A SpaceOrLine right before the close tag goes back to that line's level. The document itself does not indent.
 
-    c. Forced lines always break.
+    c. A flowing group is rendered as one run of text, including the groups inside it. Its lines only break when the text up to the next line would go over 80 columns, and stay one level deeper than the line the group started on. The lines right after its open tag and right before its close tag break like in any other wrapping group.
+
+    d. Forced lines always break.
 
 ## Definitions and Observations
 

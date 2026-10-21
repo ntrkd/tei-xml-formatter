@@ -297,6 +297,9 @@ export class Formatter {
         if (node instanceof SpaceOrLine) {
             return [' ', indentLevel];
         }
+        if (node.flow) {
+            return this.renderFlow(node, indentLevel, column);
+        }
 
         // A group that fits never has a child that wraps, children render on the same line and are never wider than their parent
         const wrap = column + node.width() > MAX_WDITH;
@@ -330,6 +333,86 @@ export class Formatter {
     private endColumn(text: string, column: number): number {
         const lastNewLine = text.lastIndexOf(NEWLINE);
         return lastNewLine === -1 ? column + text.length : text.length - lastNewLine - 1;
+    }
+
+    /**
+     * Render a group whose content flows like text. The groups inside it are flattened into one run of text,
+     * which breaks onto a new line wherever the content up to the next line would not fit.
+     * The lines right after the open tag and right before the close tag of the group break only if the group wraps
+     * @param group The flowing group to render
+     * @param indentLevel Indent level of the line the group starts on
+     * @param column Column the group starts at
+     * @returns [rendered string, indent level of the line the group ends on]
+     */
+    private renderFlow(group: Group, indentLevel: number, column: number): [string, number] {
+        const wrap = column + group.width() > MAX_WDITH;
+        const groupIndent = indentLevel;
+        const childIndent = group.indent ? groupIndent + 1 : groupIndent;
+        const afterOpen = group.nodes[1];
+        const beforeClose = group.nodes[group.nodes.length - 2];
+        const items = this.flatten(group);
+        let output = '';
+
+        items.forEach((item, i) => {
+            if (item instanceof Text) {
+                output += item.text;
+                column = this.endColumn(item.text, column);
+                return;
+            }
+
+            let newLine: boolean;
+            if (item.forced) {
+                newLine = true;
+            } else if (item === afterOpen || item === beforeClose) {
+                newLine = wrap;
+            } else {
+                newLine = column + item.width() + this.widthToNextLine(items, i + 1) > MAX_WDITH;
+            }
+
+            if (newLine) {
+                indentLevel = item === beforeClose ? groupIndent : childIndent;
+                output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+                column = indentLevel;
+            } else {
+                output += ' ';
+                column += item.width();
+            }
+        });
+
+        return [output, indentLevel];
+    }
+
+    /**
+     * Flatten a formatting tree into its text and lines, in order
+     * @param node Node to flatten
+     */
+    private flatten(node: FMTNode): (Text | SpaceOrLine)[] {
+        return node instanceof Group ? node.nodes.flatMap((child) => this.flatten(child)) : [node];
+    }
+
+    /**
+     * Width of the text from an index up to the next line, which has to stay on one line
+     * @param items Flattened text and lines
+     * @param start Index to start from
+     */
+    private widthToNextLine(items: (Text | SpaceOrLine)[], start: number): number {
+        let width = 0;
+        for (let i = start; i < items.length; i++) {
+            const item = items[i];
+            if (item === undefined || item instanceof SpaceOrLine) {
+                break;
+            }
+            width += item.width();
+        }
+        return width;
+    }
+
+    /**
+     * Whether a tag has text directly inside it. Its content then flows like text, including the tags inside it
+     * @param node Tag to check
+     */
+    private hasDirectText(node: TagNode): boolean {
+        return node.children.some((child) => child instanceof TextNode);
     }
 
     /**
@@ -387,7 +470,7 @@ export class Formatter {
                 // needs a new group attached, stack increased, and tag node textualized and added to the new group
                 const attrStr = Object.entries(focus.attributes).map(([k, v]) => ` ${k}="${v}"`).join('');
                 const tagText = `<${focus.name}${attrStr}${focus.selfClosing ? ' /' : ''}>`;
-                const newGroup = new Group([new Text(tagText)]);
+                const newGroup = new Group([new Text(tagText)], true, stackTop.flow || this.hasDirectText(focus));
                 stackTop.nodes.push(newGroup);
                 if (!focus.selfClosing) {
                     fmtStack.push(newGroup);
@@ -398,8 +481,13 @@ export class Formatter {
                 stackTop.nodes.push(new Text(closeText));
                 fmtStack.pop();
             } else if (focus instanceof TextNode) {
-                // just add as a text node
-                stackTop.nodes.push(new Text(focus.text));
+                // Text only appears in flowing groups, where it can break between any two words
+                focus.text.split(' ').forEach((word, i) => {
+                    if (i > 0) {
+                        stackTop.nodes.push(new SpaceOrLine());
+                    }
+                    stackTop.nodes.push(new Text(word));
+                });
             } else if (focus instanceof CommentNode) {
                 // rendered verbatim like text
                 stackTop.nodes.push(new Text(`<!--${focus.text}-->`));

@@ -12,10 +12,14 @@ export class Group implements BaseFMTNode {
   public nodes: FMTNode[];
   // Whether lines inside the group are indented one level deeper than the line the group starts on
   public indent: boolean;
+  // Whether the content flows like text: its lines, and the lines of the groups inside it,
+  // only break when the content up to the next line does not fit
+  public flow: boolean;
 
-  constructor(nodes: FMTNode[], indent = true) {
+  constructor(nodes: FMTNode[], indent = true, flow = false) {
     this.nodes = nodes;
     this.indent = indent;
+    this.flow = flow;
   }
 
   width() : number {

@@ -93,7 +93,7 @@ test('keeps sibling indentation after a wrapped tag ending in a space', () => {
 
 	assert.equal(
 		formatted,
-		`<TEI>\n\t<div>\n\t\t<p>a</p>\n\t\t<p>${long}\n\t\t</p>\n\t\t<p>b</p>\n\t</div>\n</TEI>`,
+		'<TEI>\n\t<div>\n\t\t<p>a</p>\n\t\t<p>lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod\n\t\t\ttempor\n\t\t</p>\n\t\t<p>b</p>\n\t</div>\n</TEI>',
 	);
 });
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
@@ -121,7 +121,10 @@ test('indents comments as the first and last children of a wrapped tag', () => {
 	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
 	const formatted = new Formatter().format(`<TEI>\n<!-- first -->\n<p>${long}</p>\n<!-- last -->\n</TEI>`);
 
-	assert.equal(formatted, `<TEI>\n\t<!-- first -->\n\t<p>${long}</p>\n\t<!-- last -->\n</TEI>`);
+	assert.equal(
+		formatted,
+		'<TEI>\n\t<!-- first -->\n\t<p>lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod\n\t\ttempor</p>\n\t<!-- last -->\n</TEI>',
+	);
 });
 
 // xml entity handling tests
@@ -215,14 +218,20 @@ test('indents content by nesting depth when a tag only has a space after its ope
 	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
 	const formatted = new Formatter().format(`<root><r> ${words}</r></root>`);
 
-	assert.equal(formatted, `<root>\n\t<r>\n\t\t${words}</r></root>`);
+	assert.equal(
+		formatted,
+		'<root>\n\t<r>\n\t\tone two three four five six seven eight nine ten eleven twelve thirteen\n\t\tfourteen</r></root>',
+	);
 });
 
 test('puts a close tag level with the line its tag opened on when only it has a space before it', () => {
 	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
 	const formatted = new Formatter().format(`<root><r>${words} </r></root>`);
 
-	assert.equal(formatted, `<root><r>${words}\n</r>\n</root>`);
+	assert.equal(
+		formatted,
+		'<root><r>one two three four five six seven eight nine ten eleven twelve thirteen\n\tfourteen\n</r>\n</root>',
+	);
 });
 
 test('indents children of a tag that shares a line with its parent', () => {
@@ -233,7 +242,7 @@ test('indents children of a tag that shares a line with its parent', () => {
 
 	assert.equal(
 		formatted,
-		`<TEI>\n\t<text>\n\t\t<body>\n\t\t\t<div><p>${words}</p>\n\t\t\t\t<p>${words} fifteen</p></div>\n\t\t</body>\n\t</text>\n</TEI>`,
+		'<TEI>\n\t<text>\n\t\t<body>\n\t\t\t<div><p>one two three four five six seven eight nine ten eleven twelve\n\t\t\t\tthirteen fourteen</p>\n\t\t\t\t<p>one two three four five six seven eight nine ten eleven twelve thirteen\n\t\t\t\t\tfourteen fifteen</p></div>\n\t\t</body>\n\t</text>\n</TEI>',
 	);
 });
 // structural indentation tests
@@ -309,5 +318,33 @@ test('wraps a group that only exceeds the width because it starts after other co
 		formatted,
 		'<r>\n\t<head>Title</head><list><item>Bath, the harbour and the mill</item>\n\t\t<item>Wells</item></list>\n</r>',
 	);
+});
+
+test('reflows text and inline elements at 80 columns', () => {
+	const formatted = new Formatter().format(
+		'<div>\n<p>The sketches are enclosed, the harbour, the mill and the church at <placeName>Wells</placeName>. I hope they arrive safely before the end of the month.</p>\n</div>',
+	);
+
+	assert.equal(
+		formatted,
+		'<div>\n\t<p>The sketches are enclosed, the harbour, the mill and the church at\n\t\t<placeName>Wells</placeName>. I hope they arrive safely before the end of the\n\t\tmonth.</p>\n</div>',
+	);
+});
+
+test('breaks inside an inline element when the text needs it', () => {
+	const formatted = new Formatter().format(
+		'<p>The committee met at the <hi rend="italic">First Baptist Church of Jacksonville on Pearl Street</hi> on Monday.</p>',
+	);
+
+	assert.equal(
+		formatted,
+		'<p>The committee met at the <hi rend="italic">First Baptist Church of\n\tJacksonville on Pearl Street</hi> on Monday.</p>',
+	);
+});
+
+test('puts a word longer than the line on its own line', () => {
+	const url = 'https://example.org/a/really/long/address/that/cannot/be/broken/anywhere/at/all/index.html';
+
+	assert.equal(new Formatter().format(`<p>See ${url} for more.</p>`), `<p>See\n\t${url}\n\tfor more.</p>`);
 });
 // wrapping tests
