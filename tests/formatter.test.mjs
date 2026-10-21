@@ -220,3 +220,29 @@ test('throws ParserError for undefined entities and invalid character references
 	}
 });
 // xml entity handling tests
+
+// processing instruction handling tests
+test('keeps whitespace inside processing instructions followed by whitespace', () => {
+	const formatted = new Formatter().format('<?xml-model href="a.rng"   type="application/xml"?>\n<TEI/>');
+
+	assert.equal(formatted, '<?xml-model href="a.rng"   type="application/xml"?> <TEI />');
+});
+
+// saxes does not report the whitespace between the target and the body, so it is always written as one space
+test('keeps multi-line processing instruction bodies verbatim', () => {
+	const formatted = new Formatter().format('<?xml version="1.0"?>\n<?pi  a\n\tb?>\n<TEI/>');
+
+	assert.equal(formatted, '<?xml version="1.0"?> <?pi a\n\tb?> <TEI />');
+});
+
+test('does not merge text into a processing instruction inside an element', () => {
+	const cases = [
+		{ xml: '<p>x<?pi   a    b?>  y</p>', expected: '<p>x<?pi a    b?> y</p>' },
+		{ xml: '<p>x<?pi   a    b?>y</p>', expected: '<p>x<?pi a    b?>y</p>' },
+	];
+
+	for (const { xml, expected } of cases) {
+		assert.equal(new Formatter().format(xml), expected);
+	}
+});
+// processing instruction handling tests
