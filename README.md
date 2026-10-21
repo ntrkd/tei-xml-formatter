@@ -112,6 +112,7 @@ First uses saxes to parse the .xml file into code which can be processed easier 
    
 	- Carrying means inserting another Spacing node after the next node if the node in front of it can be crossed.
 	- If we are carrying left, it can cross only open tags. If we are carrying right, it can cross only close tags.
+	- Self-closing tags are never crossed. They mark a position in the text (like `<lb/>`), so a space carried before one would change the text.
 	- If the Spacing node will reside next to another Spacing node, do not insert it.
    
     c. There should now be a single Spacing node everywhere we can insert spaces into.
