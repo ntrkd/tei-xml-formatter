@@ -237,3 +237,44 @@ test('indents children of a tag that shares a line with its parent', () => {
 	);
 });
 // structural indentation tests
+
+// CDATA handling tests
+test('preserves CDATA sections without adding or removing surrounding spaces', () => {
+	const cases = [
+		'<p>a <![CDATA[<b>raw</b>]]> b</p>',
+		'<p>a<![CDATA[<b>raw</b>]]>b</p>',
+		'<p>a<![CDATA[]]>b</p>',
+		'<TEI><![CDATA[a]]><![CDATA[b]]></TEI>',
+	];
+
+	for (const xml of cases) {
+		assert.equal(new Formatter().format(xml), xml);
+	}
+});
+
+test('keeps CDATA bodies verbatim', () => {
+	const xml = '<p><![CDATA[  x\n\t y &amp; &#8212; <hi> ]]></p>';
+
+	assert.equal(new Formatter().format(xml), xml);
+});
+
+test('does not merge text into a CDATA section', () => {
+	const formatted = new Formatter().format('<p>x  <![CDATA[a  b]]>\n  y</p>');
+
+	assert.equal(formatted, '<p>x <![CDATA[a  b]]> y</p>');
+});
+
+test('indents CDATA sections as children of a wrapped tag', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const formatted = new Formatter().format(`<TEI>\n<![CDATA[ first ]]>\n<p>${long}</p>\n</TEI>`);
+
+	assert.equal(formatted, `<TEI>\n\t<![CDATA[ first ]]>\n\t<p>${long}</p>\n</TEI>`);
+});
+
+test('formatting output with CDATA again does not change it', () => {
+	const formatter = new Formatter();
+	const once = formatter.format('<TEI>\n<p>a <![CDATA[ <b> &amp;\n ]]> b</p>\n</TEI>');
+
+	assert.equal(formatter.format(once), once);
+});
+// CDATA handling tests

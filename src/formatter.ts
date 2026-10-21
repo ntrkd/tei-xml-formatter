@@ -1,5 +1,5 @@
 import { SaxesParser } from 'saxes';
-import { DocumentNode, TagNode, TextNode, CommentNode, ProcessingInstructionNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
+import { DocumentNode, TagNode, TextNode, CommentNode, CDataNode, ProcessingInstructionNode, CloseTagNode, SpacingNode, isParentNode } from './ast.js';
 import type { ParentNode, ASTNode } from './ast.js';
 import { Group, Text, SpaceOrLine } from './fmt.js';
 import type { FMTNode } from "./fmt.js";
@@ -172,6 +172,14 @@ export class Formatter {
 
             // Kept as is, the comment body is not whitespace collapsed
             parent.children.push(new CommentNode(this.restoreReferences(comment), parent));
+        });
+
+        this.saxes.on("cdata", (cdata) => {
+            const parent: ParentNode | undefined = stack[stack.length - 1];
+            this.assert(!!parent, FormatterErrorCode.ParentStackEmpty, "Expected element in ParentNode stack but was empty");
+
+            // Kept as is, the body is not whitespace collapsed and references in it are literal text
+            parent.children.push(new CDataNode(this.restoreReferences(cdata), parent));
         });
 
         this.saxes.on("xmldecl", dec => { // Always the first line in the XML document
@@ -361,6 +369,9 @@ export class Formatter {
             } else if (focus instanceof CommentNode) {
                 // rendered verbatim like text
                 stackTop.nodes.push(new Text(`<!--${focus.text}-->`));
+            } else if (focus instanceof CDataNode) {
+                // rendered verbatim like text
+                stackTop.nodes.push(new Text(`<![CDATA[${focus.text}]]>`));
             } else if (focus instanceof ProcessingInstructionNode) {
                 // already holds the whole instruction, rendered as is like text
                 stackTop.nodes.push(new Text(focus.text));
