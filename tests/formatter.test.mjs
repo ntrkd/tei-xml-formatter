@@ -282,4 +282,16 @@ test('wraps a group that only exceeds the width because of its indentation', () 
 		'<a>\n\t<b>\n\t\t<c>\n\t\t\t<d>\n\t\t\t\tLetter to the committee about the new orphanage on Pearl Street, 1921\n\t\t\t</d>\n\t\t</c>\n\t</b>\n</a>',
 	);
 });
+
+test('wraps a group that only exceeds the width because it starts after other content', () => {
+	// <list> is 72 characters wide and starts after a tab and <head>
+	const formatted = new Formatter().format(
+		'<r> <head>Title</head><list><item>Bath, the harbour and the mill</item> <item>Wells</item></list> </r>',
+	);
+
+	assert.equal(
+		formatted,
+		'<r>\n\t<head>Title</head><list><item>Bath, the harbour and the mill</item>\n\t\t<item>Wells</item></list>\n</r>',
+	);
+});
 // wrapping tests

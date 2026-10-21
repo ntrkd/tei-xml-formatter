@@ -127,7 +127,7 @@ First uses saxes to parse the .xml file into code which can be processed easier 
 
 7. Generate the final XML using the formatting tree.
 
-    a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
+    a. A group wraps when the column it starts at plus its width() is over 80. Each tab counts as one column.
 
     b. Indentation follows nesting. In a wrapping group, a SpaceOrLine becomes a new line one level deeper than the line the group started on. A SpaceOrLine right before the close tag goes back to that line's level. The document itself does not indent.
 

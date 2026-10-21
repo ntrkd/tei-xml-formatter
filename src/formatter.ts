@@ -25,6 +25,10 @@ const PLACEHOLDER_FIRST = 0xE000;
 const PLACEHOLDER_LAST = 0xF8FF;
 const PLACEHOLDER_PATTERN = /[-]/g;
 
+const MAX_WDITH = 80;
+const INDENT_UNIT = '\t';
+const NEWLINE = '\n';
+
 export class FormatterError extends Error {
     public readonly code: FormatterErrorCode;
     public declare readonly cause?: Error;
@@ -270,7 +274,7 @@ export class Formatter {
         this.trimLeadingSpacing(propogateSpaces);
         this.trimTrailingSpacing(propogateSpaces);
         const fmtTree = this.buildFormattingTree(propogateSpaces);
-        const formattedFile = this.renderNode(fmtTree, 0);
+        const formattedFile = this.renderNode(fmtTree, 0, 0);
 
         return formattedFile[0];
     }
@@ -279,13 +283,10 @@ export class Formatter {
      * Recursively render a node by rendering all its children
      * @param node The node to render
      * @param indentLevel Indent level of the line the node starts on (set 0 for root node)
+     * @param column Column the node starts at, each tab counts as one column like width() (set 0 for root node)
      * @returns [rendered string, indent level of the line the node ends on]
      */
-    private renderNode(node: FMTNode, indentLevel: number): [string, number] {
-        const MAX_WDITH = 80;
-        const INDENT_UNIT = '\t';
-        const NEWLINE = '\n';
-
+    private renderNode(node: FMTNode, indentLevel: number, column: number): [string, number] {
         if (node instanceof Text) {
             return [node.text, indentLevel];
         }
@@ -294,9 +295,8 @@ export class Formatter {
             return [' ', indentLevel];
         }
 
-        // The group starts after the indent of its line, each tab counts as one column like width().
         // A group that fits never has a child that wraps, children render on the same line and are never wider than their parent
-        const wrap = indentLevel + node.width() > MAX_WDITH;
+        const wrap = column + node.width() > MAX_WDITH;
         // Indentation follows nesting: lines go one level deeper than the line the group starts on,
         // and the line before the close tag goes back to it
         const groupIndent = indentLevel;
@@ -307,14 +307,26 @@ export class Formatter {
             if (child instanceof SpaceOrLine && wrap) {
                 indentLevel = child.beforeClose ? groupIndent : childIndent;
                 output += NEWLINE + INDENT_UNIT.repeat(indentLevel);
+                column = indentLevel;
             } else {
-                const [text, endIndentLevel] = this.renderNode(child, indentLevel);
+                const [text, endIndentLevel] = this.renderNode(child, indentLevel, column);
                 output += text;
                 indentLevel = endIndentLevel;
+                column = this.endColumn(text, column);
             }
         }
 
         return [output, indentLevel];
+    }
+
+    /**
+     * Column after rendering text, each tab counts as one column like width()
+     * @param text Rendered text
+     * @param column Column the text starts at
+     */
+    private endColumn(text: string, column: number): number {
+        const lastNewLine = text.lastIndexOf(NEWLINE);
+        return lastNewLine === -1 ? column + text.length : text.length - lastNewLine - 1;
     }
 
     /**
