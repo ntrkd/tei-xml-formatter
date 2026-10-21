@@ -44,5 +44,6 @@
 
     "composite": true,
     "esModuleInterop": true,
-  }
+  },
+  "include": ["src"]
 }

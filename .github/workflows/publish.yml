@@ -1,0 +1,46 @@
+# Publishes to npm when a version tag (e.g. v1.0.5) is pushed.
+#
+# Authenticates with npm trusted publishing (OIDC), so no NPM_TOKEN secret is
+# needed and provenance is attached automatically. The trusted publisher must be
+# configured on npmjs.com with this repository and the workflow file name
+# "publish.yml".
+name: Publish to npm
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Node 24 bundles npm >= 11.5.1, which trusted publishing requires.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Check tag matches package.json version
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $expected"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # Builds dist/ and runs the test suite; publishing is skipped if this fails.
+      - run: npm test
+
+      - run: npm publish
