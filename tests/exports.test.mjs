@@ -100,6 +100,7 @@ for (const [label, fixture, options, expected, unexpected] of [
 		{
 			module: ts.ModuleKind.CommonJS,
 			moduleResolution: ts.ModuleResolutionKind.Node10,
+			ignoreDeprecations: '6.0',
 			paths: { 'tei-xml-fmt': [resolve(root)] },
 		},
 		cjsTypes,
