@@ -348,3 +348,78 @@ test('puts a word longer than the line on its own line', () => {
 	assert.equal(new Formatter().format(`<p>See ${url} for more.</p>`), `<p>See\n\t${url}\n\tfor more.</p>`);
 });
 // wrapping tests
+
+// CDATA handling tests
+test('preserves CDATA sections without adding or removing surrounding spaces', () => {
+	const cases = [
+		'<p>a <![CDATA[<b>raw</b>]]> b</p>',
+		'<p>a<![CDATA[<b>raw</b>]]>b</p>',
+		'<p>a<![CDATA[]]>b</p>',
+		'<TEI><![CDATA[a]]><![CDATA[b]]></TEI>',
+	];
+
+	for (const xml of cases) {
+		assert.equal(new Formatter().format(xml), xml);
+	}
+});
+
+test('keeps CDATA bodies verbatim', () => {
+	const xml = '<p><![CDATA[  x\n\t y &amp; &#8212; <hi> ]]></p>';
+
+	assert.equal(new Formatter().format(xml), xml);
+});
+
+test('does not merge text into a CDATA section', () => {
+	const formatted = new Formatter().format('<p>x  <![CDATA[a  b]]>\n  y</p>');
+
+	assert.equal(formatted, '<p>x <![CDATA[a  b]]> y</p>');
+});
+
+test('indents CDATA sections as children of a wrapped tag', () => {
+	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const formatted = new Formatter().format(`<TEI>\n<![CDATA[ first ]]>\n<p>${long}</p>\n</TEI>`);
+
+	assert.equal(
+		formatted,
+		'<TEI>\n\t<![CDATA[ first ]]>\n\t<p>lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod\n\t\ttempor</p>\n</TEI>',
+	);
+});
+
+test('formatting output with CDATA again does not change it', () => {
+	const formatter = new Formatter();
+	const once = formatter.format('<TEI>\n<p>a <![CDATA[ <b> &amp;\n ]]> b</p>\n</TEI>');
+
+	assert.equal(formatter.format(once), once);
+});
+// CDATA handling tests
+
+// doctype handling tests
+test('preserves doctype declarations, wrapping the document when they are long', () => {
+	const cases = [
+		{ xml: '<!DOCTYPE TEI><TEI/>', expected: '<!DOCTYPE TEI><TEI />' },
+		{ xml: '<!DOCTYPE TEI>\n<TEI/>\n', expected: '<!DOCTYPE TEI> <TEI />' },
+		{
+			xml: '<?xml version="1.0"?>\n<!DOCTYPE TEI PUBLIC "-//TEI//DTD TEI P5//EN" \'tei.dtd\'>\n<TEI><p>x</p></TEI>',
+			expected: '<?xml version="1.0"?>\n<!DOCTYPE TEI PUBLIC "-//TEI//DTD TEI P5//EN" \'tei.dtd\'>\n<TEI><p>x</p></TEI>',
+		},
+	];
+
+	for (const { xml, expected } of cases) {
+		assert.equal(new Formatter().format(xml), expected);
+	}
+});
+
+test('keeps doctype internal subsets and references in them verbatim', () => {
+	const doctype = '<!DOCTYPE  TEI  SYSTEM "tei.dtd"  [\n  <!ENTITY mdash "&#8212;">\n  <!ENTITY amp2 "&amp;">\n]>';
+	const formatted = new Formatter().format(`${doctype}\n<TEI/>`);
+
+	assert.equal(formatted, `${doctype}\n<TEI />`);
+});
+
+test('formatting output with a doctype again does not change it', () => {
+	const formatter = new Formatter();
+	const once = formatter.format('<?xml version="1.0"?>\n<!DOCTYPE TEI [ <!ENTITY a "&#97;"> ]>\n<!-- c -->\n<TEI><p>x</p></TEI>');
+
+	assert.equal(formatter.format(once), once);
+});
+// doctype handling tests
