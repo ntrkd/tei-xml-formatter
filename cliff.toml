@@ -1,0 +1,43 @@
+# git-cliff config: https://git-cliff.org/docs/configuration
+# Used by .github/workflows/publish.yml to build CHANGELOG.md and the GitHub release notes.
+# Preview the next release locally with: npx git-cliff --unreleased --tag vX.Y.Z
+
+[changelog]
+header = """
+# Changelog\n
+"""
+# Groups are prefixed with <!-- N --> so they sort in that order; striptags removes the prefix.
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}](https://github.com/ntrkd/tei-xml-formatter/releases/tag/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim }}
+    {% for commit in commits %}
+        - {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | split(pat="\n") | first | trim | upper_first }} \
+          ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/ntrkd/tei-xml-formatter/commit/{{ commit.id }}))\
+    {% endfor %}
+{% endfor %}\n
+"""
+trim = true
+
+[git]
+conventional_commits = true
+# Keep commits that predate Conventional Commits; they land in "Other".
+filter_unconventional = false
+protect_breaking_commits = true
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"
+commit_parsers = [
+    { message = "^Merge (pull request|branch)", skip = true },
+    { field = "breaking", pattern = "true", group = "<!-- 0 -->⚠ Breaking Changes" },
+    { message = "^feat", group = "<!-- 1 -->Features" },
+    { message = "^fix", group = "<!-- 2 -->Bug Fixes" },
+    { message = "^perf", group = "<!-- 3 -->Performance" },
+    { message = "^refactor", group = "<!-- 4 -->Refactoring" },
+    { message = "^docs", group = "<!-- 5 -->Documentation" },
+    { message = "^(test|style|chore|build|ci)(\\(.*\\))?:", skip = true },
+    { message = ".*", group = "<!-- 6 -->Other" },
+]
