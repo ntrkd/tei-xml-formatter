@@ -1,10 +1,12 @@
-# Publishes to npm when a version tag (e.g. v1.0.5) is pushed.
+# Publishes to npm and creates a GitHub release when a version tag (e.g. v1.0.5)
+# is pushed. Release notes and CHANGELOG.md are generated from the Conventional
+# Commits by git-cliff (see cliff.toml).
 #
 # Authenticates with npm trusted publishing (OIDC), so no NPM_TOKEN secret is
 # needed and provenance is attached automatically. The trusted publisher must be
 # configured on npmjs.com with this repository and the workflow file name
 # "publish.yml".
-name: Publish to npm
+name: Publish to npm and GitHub
 
 on:
   push:
@@ -23,6 +25,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0 # git-cliff needs the full history and tags
 
       # Node 24 bundles npm >= 11.5.1, which trusted publishing requires.
       - uses: actions/setup-node@v7
@@ -43,4 +46,41 @@ jobs:
       # Builds dist/ and runs the test suite; publishing is skipped if this fails.
       - run: npm test
 
+      # CHANGELOG.md ships in the npm package; RELEASE_NOTES.md is the GitHub release body.
+      - name: Generate changelog and release notes
+        run: |
+          npx git-cliff --output CHANGELOG.md
+          npx git-cliff --current --strip all --output RELEASE_NOTES.md
+
       - run: npm publish
+
+      - run: npm pack
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |
+            RELEASE_NOTES.md
+            *.tgz
+          if-no-files-found: error
+
+  # Separate job so a failed release can be re-run without re-publishing to npm.
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to create the release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" *.tgz \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            --verify-tag
