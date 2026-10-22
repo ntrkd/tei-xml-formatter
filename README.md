@@ -9,11 +9,14 @@ This is a TypeScript library that formats [TEI XML](https://tei-c.org/) files. I
 ### Unformatted
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE TEI SYSTEM "tei_all.dtd">
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
 <teiHeader> <fileDesc>
       <titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
   <sourceDesc> <p>Original manuscript, private collection.</p>
-</sourceDesc> </fileDesc> </teiHeader>
+</sourceDesc> </fileDesc>
+    <encodingDesc> <p>Corrections are encoded as <code><![CDATA[<choice><sic/><corr/></choice>]]></code>.</p>
+  </encodingDesc> </teiHeader>
 <text>
     <body> <div type="letter">
 <opener> <dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
@@ -33,12 +36,17 @@ the mill &amp; the church at <placeName>Wells</placeName>.     I hope they
 ### Formatted
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE TEI SYSTEM "tei_all.dtd">
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
 	<teiHeader>
 		<fileDesc>
 			<titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
 			<sourceDesc> <p>Original manuscript, private collection.</p> </sourceDesc>
 		</fileDesc>
+		<encodingDesc>
+			<p>Corrections are encoded as
+				<code><![CDATA[<choice><sic/><corr/></choice>]]></code>.</p>
+		</encodingDesc>
 	</teiHeader>
 	<text>
 		<body>
