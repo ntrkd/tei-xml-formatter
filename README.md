@@ -50,8 +50,8 @@ the mill &amp; the church at <placeName>Wells</placeName>.     I hope they
 				<p>
 					The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
 					<placeName>Wells</placeName>. I hope they arrive
-					<choice><sic>safly</sic><corr>safely</corr></choice>
-					before the end of the month.
+					<choice><sic>safly</sic><corr>safely</corr></choice> before the end of the
+					month.
 				</p>
 				<!-- signature is in a different ink -->
 				<closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
@@ -112,6 +112,7 @@ First uses saxes to parse the .xml file into code which can be processed easier 
    
 	- Carrying means inserting another Spacing node after the next node if the node in front of it can be crossed.
 	- If we are carrying left, it can cross only open tags. If we are carrying right, it can cross only close tags.
+	- Self-closing tags are never crossed. They mark a position in the text (like `<lb/>`), so a space carried before one would change the text.
 	- If the Spacing node will reside next to another Spacing node, do not insert it.
    
     c. There should now be a single Spacing node everywhere we can insert spaces into.
@@ -121,14 +122,22 @@ First uses saxes to parse the .xml file into code which can be processed easier 
     a. Convert all nodes normally into text. Spacing nodes require more attention.
    
     b. Every spacing node becomes a SpaceOrLine. We look forward to mark the ones that come right before a close tag.
+
+    c. A tag with text directly inside it flows like text, and so does everything inside it. Its text is split into words with a SpaceOrLine between each.
+
+    d. A SpaceOrLine after an `<lb/>`, or before one that has no space after it, is forced to be a new line.
    
     // TODO: A group of carried Spacing nodes should be linked together. As if all them dont need to be wrapped, only one of the Spacing nodes needs to become a space. Not all of them.
 
 7. Generate the final XML using the formatting tree.
 
-    a. Use width() calculations on the FMT nodes to determine whether to wrap then output the correct string literal.
+    a. A group wraps when the column it starts at plus its width() is over 80. Each tab counts as one column.
 
     b. Indentation follows nesting. In a wrapping group, a SpaceOrLine becomes a new line one level deeper than the line the group started on. A SpaceOrLine right before the close tag goes back to that line's level. The document itself does not indent.
+
+    c. A flowing group is rendered as one run of text, including the groups inside it. Its lines only break when the text up to the next line would go over 80 columns, and stay one level deeper than the line the group started on. The lines right after its open tag and right before its close tag break like in any other wrapping group.
+
+    d. Forced lines always break.
 
 ## Definitions and Observations
 

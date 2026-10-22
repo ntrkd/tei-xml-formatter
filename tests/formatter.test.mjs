@@ -93,7 +93,7 @@ test('keeps sibling indentation after a wrapped tag ending in a space', () => {
 
 	assert.equal(
 		formatted,
-		`<TEI>\n\t<div>\n\t\t<p>a</p>\n\t\t<p>${long}\n\t\t</p>\n\t\t<p>b</p>\n\t</div>\n</TEI>`,
+		'<TEI>\n\t<div>\n\t\t<p>a</p>\n\t\t<p>lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod\n\t\t\ttempor\n\t\t</p>\n\t\t<p>b</p>\n\t</div>\n</TEI>',
 	);
 });
 // tests for https://github.com/ntrkd/tei-xml-formatter/issues/8
@@ -121,7 +121,10 @@ test('indents comments as the first and last children of a wrapped tag', () => {
 	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
 	const formatted = new Formatter().format(`<TEI>\n<!-- first -->\n<p>${long}</p>\n<!-- last -->\n</TEI>`);
 
-	assert.equal(formatted, `<TEI>\n\t<!-- first -->\n\t<p>${long}</p>\n\t<!-- last -->\n</TEI>`);
+	assert.equal(
+		formatted,
+		'<TEI>\n\t<!-- first -->\n\t<p>lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod\n\t\ttempor</p>\n\t<!-- last -->\n</TEI>',
+	);
 });
 
 // xml entity handling tests
@@ -215,14 +218,20 @@ test('indents content by nesting depth when a tag only has a space after its ope
 	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
 	const formatted = new Formatter().format(`<root><r> ${words}</r></root>`);
 
-	assert.equal(formatted, `<root>\n\t<r>\n\t\t${words}</r></root>`);
+	assert.equal(
+		formatted,
+		'<root>\n\t<r>\n\t\tone two three four five six seven eight nine ten eleven twelve thirteen\n\t\tfourteen</r></root>',
+	);
 });
 
 test('puts a close tag level with the line its tag opened on when only it has a space before it', () => {
 	const words = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen';
 	const formatted = new Formatter().format(`<root><r>${words} </r></root>`);
 
-	assert.equal(formatted, `<root><r>${words}\n</r>\n</root>`);
+	assert.equal(
+		formatted,
+		'<root><r>one two three four five six seven eight nine ten eleven twelve thirteen\n\tfourteen\n</r>\n</root>',
+	);
 });
 
 test('indents children of a tag that shares a line with its parent', () => {
@@ -233,10 +242,112 @@ test('indents children of a tag that shares a line with its parent', () => {
 
 	assert.equal(
 		formatted,
-		`<TEI>\n\t<text>\n\t\t<body>\n\t\t\t<div><p>${words}</p>\n\t\t\t\t<p>${words} fifteen</p></div>\n\t\t</body>\n\t</text>\n</TEI>`,
+		'<TEI>\n\t<text>\n\t\t<body>\n\t\t\t<div><p>one two three four five six seven eight nine ten eleven twelve\n\t\t\t\tthirteen fourteen</p>\n\t\t\t\t<p>one two three four five six seven eight nine ten eleven twelve thirteen\n\t\t\t\t\tfourteen fifteen</p></div>\n\t\t</body>\n\t</text>\n</TEI>',
 	);
 });
 // structural indentation tests
+
+// self-closing tag spacing tests
+test('does not carry a space before a self-closing tag', () => {
+	const cases = [
+		{ xml: '<p>Episco<lb break="no"/>\npal and Jackson-<lb/>\nville</p>', expected: '<p>Episco<lb break="no" />\n\tpal and Jackson-<lb />\n\tville</p>' },
+		{ xml: '<p><lb/> text</p>', expected: '<p><lb />\n\ttext</p>' },
+		{ xml: '<p>a<pb n="2"/><lb/> b</p>', expected: '<p>a<pb n="2" /><lb />\n\tb</p>' },
+		{ xml: '<div><p>x</p><milestone unit="section"/> <p>y</p></div>', expected: '<div><p>x</p><milestone unit="section" /> <p>y</p></div>' },
+	];
+
+	for (const { xml, expected } of cases) {
+		assert.equal(new Formatter().format(xml), expected);
+	}
+});
+
+test('keeps spaces around self-closing tags that were in the source', () => {
+	for (const xml of ['<p>a <pb/> b</p>', '<p>word <pb/>next</p>']) {
+		assert.equal(new Formatter().format(xml), xml.replace('<pb/>', '<pb />'));
+	}
+});
+
+test('ends the line at an lb with a space after it', () => {
+	assert.equal(new Formatter().format('<p>a <lb/> b</p>'), '<p>a <lb />\n\tb</p>');
+	assert.equal(
+		new Formatter().format('<p>Executive committee<lb/>\nS. H. Berg, President</p>'),
+		'<p>Executive committee<lb />\n\tS. H. Berg, President</p>',
+	);
+});
+
+test('starts the line at an lb with only a space before it', () => {
+	assert.equal(new Formatter().format('<p>word <lb/>next</p>'), '<p>word\n\t<lb />next</p>');
+});
+
+test('keeps an lb without spaces around it on its line', () => {
+	assert.equal(new Formatter().format('<p>Episco<lb break="no"/>pal</p>'), '<p>Episco<lb break="no" />pal</p>');
+});
+
+test('keeps self-closing tags at the end of their line when wrapping', () => {
+	const formatted = new Formatter().format(
+		'<div>\n<p>Executive committee<lb/>\n<name>S. H. Berg</name>, President<lb/>\n<name>Louie Limbaugh</name>, Vice President<lb/>\nMrs. E. G. McFadden, Secretary</p>\n</div>',
+	);
+
+	assert.equal(
+		formatted,
+		'<div>\n\t<p>Executive committee<lb />\n\t\t<name>S. H. Berg</name>, President<lb />\n\t\t<name>Louie Limbaugh</name>, Vice President<lb />\n\t\tMrs. E. G. McFadden, Secretary</p>\n</div>',
+	);
+});
+// self-closing tag spacing tests
+
+// wrapping tests
+test('wraps a group that only exceeds the width because of its indentation', () => {
+	// <d> is 78 characters wide and starts after 3 tabs
+	const formatted = new Formatter().format(
+		'<a> <b> <c> <d> Letter to the committee about the new orphanage on Pearl Street, 1921 </d> </c> </b> </a>',
+	);
+
+	assert.equal(
+		formatted,
+		'<a>\n\t<b>\n\t\t<c>\n\t\t\t<d>\n\t\t\t\tLetter to the committee about the new orphanage on Pearl Street, 1921\n\t\t\t</d>\n\t\t</c>\n\t</b>\n</a>',
+	);
+});
+
+test('wraps a group that only exceeds the width because it starts after other content', () => {
+	// <list> is 72 characters wide and starts after a tab and <head>
+	const formatted = new Formatter().format(
+		'<r> <head>Title</head><list><item>Bath, the harbour and the mill</item> <item>Wells</item></list> </r>',
+	);
+
+	assert.equal(
+		formatted,
+		'<r>\n\t<head>Title</head><list><item>Bath, the harbour and the mill</item>\n\t\t<item>Wells</item></list>\n</r>',
+	);
+});
+
+test('reflows text and inline elements at 80 columns', () => {
+	const formatted = new Formatter().format(
+		'<div>\n<p>The sketches are enclosed, the harbour, the mill and the church at <placeName>Wells</placeName>. I hope they arrive safely before the end of the month.</p>\n</div>',
+	);
+
+	assert.equal(
+		formatted,
+		'<div>\n\t<p>The sketches are enclosed, the harbour, the mill and the church at\n\t\t<placeName>Wells</placeName>. I hope they arrive safely before the end of the\n\t\tmonth.</p>\n</div>',
+	);
+});
+
+test('breaks inside an inline element when the text needs it', () => {
+	const formatted = new Formatter().format(
+		'<p>The committee met at the <hi rend="italic">First Baptist Church of Jacksonville on Pearl Street</hi> on Monday.</p>',
+	);
+
+	assert.equal(
+		formatted,
+		'<p>The committee met at the <hi rend="italic">First Baptist Church of\n\tJacksonville on Pearl Street</hi> on Monday.</p>',
+	);
+});
+
+test('puts a word longer than the line on its own line', () => {
+	const url = 'https://example.org/a/really/long/address/that/cannot/be/broken/anywhere/at/all/index.html';
+
+	assert.equal(new Formatter().format(`<p>See ${url} for more.</p>`), `<p>See\n\t${url}\n\tfor more.</p>`);
+});
+// wrapping tests
 
 // CDATA handling tests
 test('preserves CDATA sections without adding or removing surrounding spaces', () => {
