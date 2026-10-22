@@ -379,7 +379,10 @@ test('indents CDATA sections as children of a wrapped tag', () => {
 	const long = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
 	const formatted = new Formatter().format(`<TEI>\n<![CDATA[ first ]]>\n<p>${long}</p>\n</TEI>`);
 
-	assert.equal(formatted, `<TEI>\n\t<![CDATA[ first ]]>\n\t<p>${long}</p>\n</TEI>`);
+	assert.equal(
+		formatted,
+		'<TEI>\n\t<![CDATA[ first ]]>\n\t<p>lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod\n\t\ttempor</p>\n</TEI>',
+	);
 });
 
 test('formatting output with CDATA again does not change it', () => {
