@@ -38,36 +38,38 @@ the mill &amp; the church at <placeName>Wells</placeName>.     I hope they
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE TEI SYSTEM "tei_all.dtd">
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
-	<teiHeader>
-		<fileDesc>
-			<titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
-			<sourceDesc> <p>Original manuscript, private collection.</p> </sourceDesc>
-		</fileDesc>
-		<encodingDesc>
-			<p>Corrections are encoded as
-				<code><![CDATA[<choice><sic/><corr/></choice>]]></code>.</p>
-		</encodingDesc>
-	</teiHeader>
-	<text>
-		<body>
-			<div type="letter">
-				<opener>
-					<dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
-					<salute>My dear John,</salute>
-				</opener>
-				<p>
-					The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
-					<placeName>Wells</placeName>. I hope they arrive
-					<choice><sic>safly</sic><corr>safely</corr></choice> before the end of the
-					month.
-				</p>
-				<!-- signature is in a different ink -->
-				<closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
-			</div>
-		</body>
-	</text>
+  <teiHeader>
+    <fileDesc>
+      <titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
+      <sourceDesc> <p>Original manuscript, private collection.</p> </sourceDesc>
+    </fileDesc>
+    <encodingDesc>
+      <p>Corrections are encoded as
+        <code><![CDATA[<choice><sic/><corr/></choice>]]></code>.</p>
+    </encodingDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <div type="letter">
+        <opener>
+          <dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
+          <salute>My dear John,</salute>
+        </opener>
+        <p>
+          The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
+          <placeName>Wells</placeName>. I hope they arrive
+          <choice><sic>safly</sic><corr>safely</corr></choice> before the end of the
+          month.
+        </p>
+        <!-- signature is in a different ink -->
+        <closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
+      </div>
+    </body>
+  </text>
 </TEI>
 ```
+
+The formatter indents with tabs. They are shown as 2 spaces here because GitHub renders tabs 8 columns wide.
 
 ## Importing and Usage
 The package is published on [npmjs](www.npmjs.com/package/tei-xml-fmt). We publish CJS and [ESM](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import) versions to allow either type of project to import.
