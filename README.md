@@ -9,11 +9,14 @@ This is a TypeScript library that formats [TEI XML](https://tei-c.org/) files. I
 ### Unformatted
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE TEI SYSTEM "tei_all.dtd">
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
 <teiHeader> <fileDesc>
       <titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
   <sourceDesc> <p>Original manuscript, private collection.</p>
-</sourceDesc> </fileDesc> </teiHeader>
+</sourceDesc> </fileDesc>
+    <encodingDesc> <p>Corrections are encoded as <code><![CDATA[<choice><sic/><corr/></choice>]]></code>.</p>
+  </encodingDesc> </teiHeader>
 <text>
     <body> <div type="letter">
 <opener> <dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
@@ -33,33 +36,40 @@ the mill &amp; the church at <placeName>Wells</placeName>.     I hope they
 ### Formatted
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE TEI SYSTEM "tei_all.dtd">
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
-	<teiHeader>
-		<fileDesc>
-			<titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
-			<sourceDesc> <p>Original manuscript, private collection.</p> </sourceDesc>
-		</fileDesc>
-	</teiHeader>
-	<text>
-		<body>
-			<div type="letter">
-				<opener>
-					<dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
-					<salute>My dear John,</salute>
-				</opener>
-				<p>
-					The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
-					<placeName>Wells</placeName>. I hope they arrive
-					<choice><sic>safly</sic><corr>safely</corr></choice> before the end of the
-					month.
-				</p>
-				<!-- signature is in a different ink -->
-				<closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
-			</div>
-		</body>
-	</text>
+  <teiHeader>
+    <fileDesc>
+      <titleStmt> <title>Letter from Emily Hart to John Reed</title> </titleStmt>
+      <sourceDesc> <p>Original manuscript, private collection.</p> </sourceDesc>
+    </fileDesc>
+    <encodingDesc>
+      <p>Corrections are encoded as
+        <code><![CDATA[<choice><sic/><corr/></choice>]]></code>.</p>
+    </encodingDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <div type="letter">
+        <opener>
+          <dateline>Bath, <date when="1862-10-14">14 October 1862</date></dateline>
+          <salute>My dear John,</salute>
+        </opener>
+        <p>
+          The sketches are enclosed &#8212; the harbour, the mill &amp; the church at
+          <placeName>Wells</placeName>. I hope they arrive
+          <choice><sic>safly</sic><corr>safely</corr></choice> before the end of the
+          month.
+        </p>
+        <!-- signature is in a different ink -->
+        <closer> <salute>Yours ever,</salute> <signed>Emily</signed> </closer>
+      </div>
+    </body>
+  </text>
 </TEI>
 ```
+
+The formatter indents with tabs. They are shown as 2 spaces here because GitHub renders tabs 8 columns wide.
 
 ## Importing and Usage
 The package is published on [npmjs](www.npmjs.com/package/tei-xml-fmt). We publish CJS and [ESM](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import) versions to allow either type of project to import.
@@ -147,7 +157,7 @@ First uses saxes to parse the .xml file into code which can be processed easier 
 - Block tags are tags that make their own spacing during rendering thus ignoring the immediate spacing around them.
 - Inline tags are tags that depend on spacing near them. Having no space means the rendered text might be joined together. However, having even one space between multiple inline tags that aren't interrupted by text means that all of them can have spaces and not change the final layout.
 - I have yet to encouter a tag that has asymmetrical spacing requirements. So for now we disregard them.
-- Ignore everything but open tags, close tags, text nodes, comments, processing instructions, and the XML declaration for now. CDATA and doctype will be implemented at a later date. Comments are kept verbatim and are treated like text when deciding spacing.
+- Open tags, close tags, text nodes, comments, CDATA sections, processing instructions, the XML declaration, and the doctype declaration are supported. Comments, CDATA sections, and the doctype are kept verbatim and are treated like text when deciding spacing. Entities declared in a doctype's internal subset are not expanded, so references to them are still reported as parser errors.
 
 ## Credits
 

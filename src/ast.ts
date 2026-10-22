@@ -7,7 +7,9 @@ export type ASTNode = DocumentNode
     | CloseTagNode
     | TextNode
     | CommentNode
+    | CDataNode
     | ProcessingInstructionNode
+    | DoctypeNode
     | SpacingNode;
 
 export interface BaseASTNode {
@@ -124,10 +126,42 @@ export class CommentNode implements BaseASTNode {
     }
 }
 
+// CDATA Node - Contains the CDATA section body (without <![CDATA[ ]]>) exactly as written in the source.
+// Kept separate from TextNode so its whitespace is never collapsed and text is never merged into it.
+export class CDataNode implements BaseASTNode {
+    kind = 'CData' as const;
+    text: string;
+    parent: ParentNode | null;
+
+    constructor(
+        text: string,
+        parent: ParentNode | null = null
+    ) {
+        this.text = text;
+        this.parent = parent;
+    }
+}
+
 // Processing Instruction Node - Contains a whole processing instruction or the XML declaration (with <? ?>),
 // exactly as it will be written. Kept separate from TextNode so following text is never merged into it.
 export class ProcessingInstructionNode implements BaseASTNode {
     kind = 'ProcessingInstruction' as const;
+    text: string;
+    parent: ParentNode | null;
+
+    constructor(
+        text: string,
+        parent: ParentNode | null = null
+    ) {
+        this.text = text;
+        this.parent = parent;
+    }
+}
+
+// Doctype Node - Contains the whole doctype declaration (with <!DOCTYPE >), including any internal subset,
+// exactly as it will be written.
+export class DoctypeNode implements BaseASTNode {
+    kind = 'Doctype' as const;
     text: string;
     parent: ParentNode | null;
 
