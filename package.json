@@ -42,7 +42,7 @@
 	"homepage": "https://github.com/ntrkd/tei-xml-formatter#readme",
 	"scripts": {
 		"start": "tsc --watch",
-		"build": "tsc && tsc-alias -p tsconfig.json",
+		"build": "tsc",
 		"postbuild": "esm2cjs --in ./dist/esm --out ./dist/cjs -l error",
 		"lint": "biome lint --write",
 		"test": "npm run build && node --test tests/*.test.mjs"
@@ -51,7 +51,6 @@
 		"@alcalzone/esm2cjs": "^1.1.2",
 		"@biomejs/biome": "^2.4.9",
 		"git-cliff": "^2.14.2",
-		"tsc-alias": "^1.8.8",
 		"typescript": "^5.2.2"
 	},
 	"dependencies": {
